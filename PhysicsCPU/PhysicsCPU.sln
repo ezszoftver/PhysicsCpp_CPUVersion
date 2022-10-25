@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32901.82
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PhysicsCPU", "PhysicsCPU\PhysicsCPU.vcxproj", "{E4A085C4-D1A6-4949-8958-FEBBA444A50B}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Test01", "Test01\Test01.vcxproj", "{084CC649-AFCE-4F72-9125-A00F822BDA40}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E4A085C4-D1A6-4949-8958-FEBBA444A50B} = {E4A085C4-D1A6-4949-8958-FEBBA444A50B}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E4A085C4-D1A6-4949-8958-FEBBA444A50B}.Debug|x64.ActiveCfg = Debug|x64
+		{E4A085C4-D1A6-4949-8958-FEBBA444A50B}.Debug|x64.Build.0 = Debug|x64
+		{E4A085C4-D1A6-4949-8958-FEBBA444A50B}.Release|x64.ActiveCfg = Release|x64
+		{E4A085C4-D1A6-4949-8958-FEBBA444A50B}.Release|x64.Build.0 = Release|x64
+		{084CC649-AFCE-4F72-9125-A00F822BDA40}.Debug|x64.ActiveCfg = Debug|x64
+		{084CC649-AFCE-4F72-9125-A00F822BDA40}.Debug|x64.Build.0 = Debug|x64
+		{084CC649-AFCE-4F72-9125-A00F822BDA40}.Release|x64.ActiveCfg = Release|x64
+		{084CC649-AFCE-4F72-9125-A00F822BDA40}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B0E4E88B-C08D-4524-85FF-26A38F19CC0F}
+	EndGlobalSection
+EndGlobal
