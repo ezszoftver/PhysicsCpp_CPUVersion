@@ -45,12 +45,12 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>..\PhysicsCPU;$(IncludePath)</IncludePath>
+    <IncludePath>.\SDKs\glm;..\PhysicsCPU;$(IncludePath)</IncludePath>
     <LibraryPath>..\x64\Debug;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>..\PhysicsCPU;$(IncludePath)</IncludePath>
+    <IncludePath>.\SDKs\glm;..\PhysicsCPU;$(IncludePath)</IncludePath>
     <LibraryPath>..\x64\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">

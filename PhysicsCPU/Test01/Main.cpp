@@ -9,8 +9,9 @@ Physics* pPhysics = NULL;
 int main(int argc, char **argv) 
 {
 	pPhysics = new Physics();
+	pPhysics->SetGravity(glm::vec3(0, -1, 0));
 
-	pPhysics->Print();
+	;
 
 	delete pPhysics;
 	pPhysics = NULL;
