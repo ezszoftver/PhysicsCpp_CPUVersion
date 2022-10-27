@@ -26,7 +26,7 @@ namespace PhysicsCPU
             float m_fCurrentTime;
             float m_fMaxTime;
 
-            uint8_t m_nNumEvaluates;
+            uint8_t m_nNumSubIntegrates;
         };
 
     public:
@@ -76,7 +76,7 @@ namespace PhysicsCPU
 
             m_common.m_nFps = nFps;
             m_common.m_fFixedDeltaTime = 1.0f / (float)m_common.m_nFps;
-            m_common.m_nNumEvaluates = 10;
+            m_common.m_nNumSubIntegrates = 10;
         }
 
         ~Physics()
@@ -117,13 +117,9 @@ namespace PhysicsCPU
     private:
         void FixedUpdate() 
         {
-            float fEvaluateDeltaTime = m_common.m_fFixedDeltaTime / (float)m_common.m_nNumEvaluates;
-            for (int i = 0; i < m_common.m_nNumEvaluates; i++)
-            {
-                Integrate(fEvaluateDeltaTime);
-            }
-
+            Integrate();
             UpdateTransforms();
+
             UpdateBVHTree();
 
             CollisionDetection();
@@ -131,31 +127,37 @@ namespace PhysicsCPU
             UpdateTransforms();
         }
 
-        void Integrate(float fDeltaTime)
+        void Integrate()
         {
+            float dt = m_common.m_fFixedDeltaTime / (float)m_common.m_nNumSubIntegrates;
+
             //std::for_each(std::execution::par_unseq, std::begin(m_listRigidBodies), std::end(m_listRigidBodies), [&](struct RigidBody rigidBody)
-            for(int i = 0; i < m_listRigidBodies.size(); i++)
+            for(int id = 0; id < m_listRigidBodies.size(); id++)
             {
-                struct RigidBody& rigidBody = m_listRigidBodies[i];
+                struct RigidBody& rigidBody = m_listRigidBodies[id];
 
                 if (rigidBody.m_fMass <= 0) 
                 {
                     return;
                 }
 
-                // translate
-                rigidBody.m_v3LinearAcceleration = m_common.m_v3Gravity + (rigidBody.m_v3Force / rigidBody.m_fMass);
-                rigidBody.m_v3LinearVelocity += rigidBody.m_v3LinearAcceleration * fDeltaTime;
-                rigidBody.m_v3Position += rigidBody.m_v3LinearVelocity * fDeltaTime;
+                for (int i = 0; i < m_common.m_nNumSubIntegrates; i++)
+                {
+                    // translate
+                    rigidBody.m_v3LinearAcceleration = m_common.m_v3Gravity + (rigidBody.m_v3Force / rigidBody.m_fMass);
+                    rigidBody.m_v3LinearVelocity += rigidBody.m_v3LinearAcceleration * dt;
+                    rigidBody.m_v3Position += rigidBody.m_v3LinearVelocity * dt;
 
-                // rotate
-                rigidBody.m_v3AngularAcceleration = (rigidBody.m_v3Torque / rigidBody.m_fMass);
-                rigidBody.m_v3AngularVelocity += rigidBody.m_v3AngularAcceleration * fDeltaTime;
-                rigidBody.m_v3Rotate += rigidBody.m_v3AngularVelocity * fDeltaTime;
+                    // rotate
+                    rigidBody.m_v3AngularAcceleration = (rigidBody.m_v3Torque / rigidBody.m_fMass);
+                    rigidBody.m_v3AngularVelocity += rigidBody.m_v3AngularAcceleration * dt;
+                    rigidBody.m_v3Rotate += rigidBody.m_v3AngularVelocity * dt;
 
-                // damping
-                rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, fDeltaTime);
-                rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, fDeltaTime);
+                    // damping
+                    rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, dt);
+                    rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, dt);
+                }
+                
             }//);
         }
 
