@@ -75,6 +75,7 @@ namespace PhysicsCPU
             memset(&m_common, NULL, sizeof(struct Common));
 
             m_common.m_nFps = nFps;
+            m_common.m_fFixedDeltaTime = 1.0f / (float)m_common.m_nFps;
             m_common.m_nNumEvaluates = 10;
         }
 
@@ -95,7 +96,6 @@ namespace PhysicsCPU
         void Update(float fDeltaTime) 
         {
             m_common.m_fDeltaTime = fDeltaTime;
-            m_common.m_fFixedDeltaTime = 1.0f / (float)m_common.m_nFps;
             m_common.m_fMaxTime += fDeltaTime;
             
             for (; m_common.m_fCurrentTime < m_common.m_fMaxTime; m_common.m_fCurrentTime += m_common.m_fFixedDeltaTime)
@@ -120,14 +120,24 @@ namespace PhysicsCPU
             float fEvaluateDeltaTime = m_common.m_fFixedDeltaTime / (float)m_common.m_nNumEvaluates;
             for (int i = 0; i < m_common.m_nNumEvaluates; i++)
             {
-                Evaluate(fEvaluateDeltaTime);
+                Integrate(fEvaluateDeltaTime);
             }
+
+            UpdateTransforms();
+            UpdateBVHTree();
+
+            CollisionDetection();
+            CollisionResponse();
+            UpdateTransforms();
         }
 
-        void Evaluate(float fDeltaTime)
+        void Integrate(float fDeltaTime)
         {
-            std::for_each(std::execution::par_unseq, std::begin(m_listRigidBodies), std::end(m_listRigidBodies), [&](struct RigidBody rigidBody)
+            //std::for_each(std::execution::par_unseq, std::begin(m_listRigidBodies), std::end(m_listRigidBodies), [&](struct RigidBody rigidBody)
+            for(int i = 0; i < m_listRigidBodies.size(); i++)
             {
+                struct RigidBody& rigidBody = m_listRigidBodies[i];
+
                 if (rigidBody.m_fMass <= 0) 
                 {
                     return;
@@ -146,7 +156,23 @@ namespace PhysicsCPU
                 // damping
                 rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, fDeltaTime);
                 rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, fDeltaTime);
-            });
+            }//);
+        }
+
+        void UpdateTransforms()
+        {
+        }
+
+        void UpdateBVHTree() 
+        {
+        }
+
+        void CollisionDetection() 
+        {
+        }
+
+        void CollisionResponse() 
+        {
         }
 	};
 }
