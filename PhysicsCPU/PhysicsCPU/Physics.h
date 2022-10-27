@@ -42,7 +42,7 @@ namespace PhysicsCPU
             glm::vec3 m_v3Torque;
             glm::vec3 m_v3AngularAcceleration;
             glm::vec3 m_v3AngularVelocity;
-            glm::vec3 m_v3Rotate;
+            glm::vec3 m_v3PitchYawRoll;
 
             float m_fLinearDamping;
             float m_fAngularDamping;
@@ -151,7 +151,7 @@ namespace PhysicsCPU
                     // rotate
                     rigidBody.m_v3AngularAcceleration = (rigidBody.m_v3Torque / rigidBody.m_fMass);
                     rigidBody.m_v3AngularVelocity += rigidBody.m_v3AngularAcceleration * dt;
-                    rigidBody.m_v3Rotate += rigidBody.m_v3AngularVelocity * dt;
+                    rigidBody.m_v3PitchYawRoll += rigidBody.m_v3AngularVelocity * dt;
 
                     // damping
                     rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, dt);
@@ -163,6 +163,17 @@ namespace PhysicsCPU
 
         void UpdateTransforms()
         {
+            //std::for_each(std::execution::par_unseq, std::begin(m_listRigidBodies), std::end(m_listRigidBodies), [&](struct RigidBody rigidBody)
+            for (int id = 0; id < m_listRigidBodies.size(); id++)
+            {
+                struct RigidBody& rigidBody = m_listRigidBodies[id];
+
+                glm::quat quat = glm::quat(rigidBody.m_v3PitchYawRoll);
+                glm::mat4 matRotate = glm::toMat4(quat);
+                glm::mat4 matTranslate = glm::translate(rigidBody.m_v3Position);
+
+                rigidBody.m_m4World = matTranslate * matRotate;
+            }//);
         }
 
         void UpdateBVHTree() 
