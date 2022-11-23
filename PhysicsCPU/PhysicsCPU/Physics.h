@@ -47,7 +47,12 @@ namespace PhysicsCPU
             float m_fLinearDamping;
             float m_fAngularDamping;
 
-            glm::mat4x4 m_m4World;
+            glm::mat4x4 m_matWorld;
+
+            glm::vec3 m_v3Min0;
+            glm::vec3 m_v3Max0;
+            glm::vec3 m_v3Min;
+            glm::vec3 m_v3Max;
         };
 
         struct Material
@@ -56,13 +61,21 @@ namespace PhysicsCPU
             float m_fFriction;
         };
 
+        struct Triangle 
+        {
+            uint32_t m_nAId;
+            uint32_t m_nBId;
+            uint32_t m_nCId;
+            glm::vec3 m_v3Normal;
+        };
+
         struct ConvexTriMesh
         {
             struct RigidBody m_rigidBody;
             uint16_t m_nMaterialId;
 
             std::vector<glm::vec3> m_listPoints;
-            std::vector<uint16_t> m_listIndices;
+            std::vector<Triangle> m_listTriangles;
         };
 
         struct Common m_common;
@@ -88,7 +101,7 @@ namespace PhysicsCPU
             for (int i = 0; i < m_listConvexTriMeshs.size(); i++)
             {
                 m_listConvexTriMeshs[i].m_listPoints.clear();
-                m_listConvexTriMeshs[i].m_listIndices.clear();
+                m_listConvexTriMeshs[i].m_listTriangles.clear();
             }
             m_listConvexTriMeshs.clear();
         }
@@ -172,7 +185,7 @@ namespace PhysicsCPU
                 glm::mat4 matRotate = glm::toMat4(quat);
                 glm::mat4 matTranslate = glm::translate(rigidBody.m_v3Position);
 
-                rigidBody.m_m4World = matTranslate * matRotate;
+                rigidBody.m_matWorld = matTranslate * matRotate;
             }//);
         }
 
