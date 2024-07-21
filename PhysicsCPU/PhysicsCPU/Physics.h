@@ -18,7 +18,7 @@ namespace PhysicsCPU
         struct Common
         {
             glm::vec3 m_v3Gravity;
-            uint16_t m_nFps;
+            int16_t m_nFps;
 
             float m_fDeltaTime;
             float m_fFixedDeltaTime;
@@ -26,10 +26,33 @@ namespace PhysicsCPU
             float m_fCurrentTime;
             float m_fMaxTime;
 
-            uint8_t m_nNumSubIntegrates;
+            int8_t m_nNumSubIntegrates;
         };
 
     public:
+        struct Material
+        {
+            float m_fRestitution;
+            float m_fFriction;
+        };
+
+        struct Triangle
+        {
+            int32_t m_nAId;
+            int32_t m_nBId;
+            int32_t m_nCId;
+            glm::vec3 m_v3Normal;
+        };
+
+        struct ConvexTriMesh
+        {
+            std::vector<glm::vec3> m_listVertices;
+            std::vector<Triangle> m_listTriangles;
+
+            glm::vec3 m_v3LocalMin;
+            glm::vec3 m_v3LocalMax;
+        };
+
         struct RigidBody
         {
             float m_fMass;
@@ -50,41 +73,16 @@ namespace PhysicsCPU
 
             glm::mat4x4 m_matWorld;
 
-            glm::vec3 m_v3Min0;
-            glm::vec3 m_v3Max0;
-            glm::vec3 m_v3Min;
-            glm::vec3 m_v3Max;
-        };
-
-        struct Material
-        {
-            float m_fRestitution;
-            float m_fFriction;
-        };
-
-        struct Triangle 
-        {
-            uint32_t m_nAId;
-            uint32_t m_nBId;
-            uint32_t m_nCId;
-            glm::vec3 m_v3Normal;
-        };
-
-        struct ConvexTriMesh
-        {
-            struct RigidBody m_rigidBody;
-            uint16_t m_nMaterialId;
-
-            std::vector<glm::vec3> m_listPoints;
-            std::vector<Triangle> m_listTriangles;
+            int32_t m_nConvexTriMeshId;
+            int16_t m_nMaterialId;
         };
 
         struct Common m_common;
-        std::vector<struct RigidBody> m_listRigidBodies;
         std::vector<struct Material> m_listMaterials;
         std::vector<struct ConvexTriMesh> m_listConvexTriMeshs;
+        std::vector<struct RigidBody> m_listRigidBodies;
 
-        Physics(uint16_t nFps = 60)
+        Physics(int16_t nFps = 60)
         {
             memset(&m_common, NULL, sizeof(struct Common));
 
@@ -101,7 +99,7 @@ namespace PhysicsCPU
 
             for (int i = 0; i < m_listConvexTriMeshs.size(); i++)
             {
-                m_listConvexTriMeshs[i].m_listPoints.clear();
+                m_listConvexTriMeshs[i].m_listVertices.clear();
                 m_listConvexTriMeshs[i].m_listTriangles.clear();
             }
             m_listConvexTriMeshs.clear();
@@ -128,6 +126,72 @@ namespace PhysicsCPU
             return m_common.m_v3Gravity;
         }
 
+        int32_t GenMaterial() 
+        {
+            int32_t nId = (int32_t)m_listMaterials.size();
+
+            struct Material material;
+            material.m_fRestitution = 0.0f;
+            material.m_fFriction = 0.0f;
+            m_listMaterials.push_back(material);
+
+            return nId;
+        }
+
+        struct Material* GetMaterial(int32_t nId) 
+        {
+            return &(m_listMaterials[nId]);
+        }
+
+        int32_t GenConvexTriMesh() 
+        {
+            int32_t nId = (int32_t)m_listConvexTriMeshs.size();
+
+            struct ConvexTriMesh convexTriMesh;
+            convexTriMesh.m_listVertices.clear();
+            convexTriMesh.m_listTriangles.clear();
+            convexTriMesh.m_v3LocalMin = glm::vec3(0.0f, 0.0f, 0.0f);
+            convexTriMesh.m_v3LocalMax = glm::vec3(0.0f, 0.0f, 0.0f);
+            m_listConvexTriMeshs.push_back(convexTriMesh);
+
+            return nId;
+        }
+
+        struct ConvexTriMesh* GetConvexTriMesh(int32_t nId)
+        {
+            return &(m_listConvexTriMeshs[nId]);
+        }
+
+        int32_t GenRigidBody()
+        {
+            int32_t nId = (int32_t)m_listRigidBodies.size();
+
+            struct RigidBody rigidBody;
+            rigidBody.m_fMass = 0.0f;
+            rigidBody.m_v3Force = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3LinearAcceleration = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3LinearVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3Position = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3Torque = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3AngularAcceleration = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3AngularVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
+            rigidBody.m_v3Axis = glm::vec3(1, 0, 0);
+            rigidBody.m_fAngle = 0.0f;
+            rigidBody.m_fLinearDamping = 0.0f;
+            rigidBody.m_fAngularDamping = 0.0f;
+            rigidBody.m_matWorld = glm::identity<glm::mat4>();
+            rigidBody.m_nConvexTriMeshId = -1;
+            rigidBody.m_nMaterialId = -1;
+            m_listRigidBodies.push_back(rigidBody);
+
+            return nId;
+        }
+
+        struct RigidBody* GetRigidBody(int32_t nId)
+        {
+            return &(m_listRigidBodies[nId]);
+        }
+
     private:
         void FixedUpdate() 
         {
@@ -152,7 +216,8 @@ namespace PhysicsCPU
 
                 if (rigidBody.m_fMass <= 0) 
                 {
-                    return;
+                    //return;
+                    continue;
                 }
 
                 for (int i = 0; i < m_common.m_nNumSubIntegrates; i++)
@@ -173,8 +238,7 @@ namespace PhysicsCPU
                     // axis, angle
                     float fDeltaAngle = glm::length(rigidBody.m_v3AngularVelocity) * dt;
                     glm::vec3 v3RotationAxis = glm::normalize(rigidBody.m_v3AngularVelocity);
-                    rigidBody.m_v3Axis = glm::rotate(rigidBody.m_v3Axis, fDeltaAngle, v3RotationAxis);
-                    rigidBody.m_v3Axis = glm::normalize(rigidBody.m_v3Axis);
+                    rigidBody.m_v3Axis = glm::normalize(glm::rotate(rigidBody.m_v3Axis, fDeltaAngle, v3RotationAxis));
                     rigidBody.m_fAngle += fDeltaAngle;
                 }
                 

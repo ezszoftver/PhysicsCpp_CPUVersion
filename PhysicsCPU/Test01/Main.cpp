@@ -4,7 +4,6 @@
 #include <gl/GL.h>
 #include <GLFW/glfw3.h>
 GLFWwindow* pWindow;
-int nWidth, nHeight;
 
 #include "Physics.h"
 using namespace PhysicsCPU;
@@ -26,6 +25,7 @@ void Exit()
 
 void Update() 
 {
+	int nWidth, nHeight;
 	glfwGetFramebufferSize(pWindow, &nWidth, &nHeight);
 	glViewport(0, 0, nWidth, nHeight);
 
@@ -45,9 +45,18 @@ int main(int argc, char **argv)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-	pWindow = glfwCreateWindow(800, 600, "PhysicsCPU - Test01", NULL, NULL);
+	int nWindowWidth = 1280;
+	int nWindowHeight = 720;
+	pWindow = glfwCreateWindow(nWindowWidth, nWindowHeight, "PhysicsCPU - Test01", NULL, NULL);
 	glfwMakeContextCurrent(pWindow);
 	glfwSwapInterval(0);
+
+	// center of monitor
+	GLFWmonitor *pPrimaryMonitor = glfwGetPrimaryMonitor();
+	const GLFWvidmode *pMode = glfwGetVideoMode(pPrimaryMonitor);
+	int xpos = (pMode->width - nWindowWidth) / 2;
+	int ypos = (pMode->height - nWindowHeight) / 2;
+	glfwSetWindowPos(pWindow, xpos, ypos);
 
 	if (false == Init()) 
 	{
