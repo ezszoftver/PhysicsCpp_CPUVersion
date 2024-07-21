@@ -42,7 +42,8 @@ namespace PhysicsCPU
             glm::vec3 m_v3Torque;
             glm::vec3 m_v3AngularAcceleration;
             glm::vec3 m_v3AngularVelocity;
-            glm::vec3 m_v3PitchYawRoll;
+            glm::vec3 m_v3Axis;
+            float m_fAngle;
 
             float m_fLinearDamping;
             float m_fAngularDamping;
@@ -164,11 +165,17 @@ namespace PhysicsCPU
                     // rotate
                     rigidBody.m_v3AngularAcceleration = (rigidBody.m_v3Torque / rigidBody.m_fMass);
                     rigidBody.m_v3AngularVelocity += rigidBody.m_v3AngularAcceleration * dt;
-                    rigidBody.m_v3PitchYawRoll += rigidBody.m_v3AngularVelocity * dt;
-
+                    
                     // damping
                     rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, dt);
                     rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, dt);
+
+                    // axis, angle
+                    float fDeltaAngle = glm::length(rigidBody.m_v3AngularVelocity) * dt;
+                    glm::vec3 v3RotationAxis = glm::normalize(rigidBody.m_v3AngularVelocity);
+                    rigidBody.m_v3Axis = glm::rotate(rigidBody.m_v3Axis, fDeltaAngle, v3RotationAxis);
+                    rigidBody.m_v3Axis = glm::normalize(rigidBody.m_v3Axis);
+                    rigidBody.m_fAngle += fDeltaAngle;
                 }
                 
             }//);
@@ -181,7 +188,7 @@ namespace PhysicsCPU
             {
                 struct RigidBody& rigidBody = m_listRigidBodies[id];
 
-                glm::quat quat = glm::quat(rigidBody.m_v3PitchYawRoll);
+                glm::quat quat = glm::angleAxis(rigidBody.m_fAngle, rigidBody.m_v3Axis);
                 glm::mat4 matRotate = glm::toMat4(quat);
                 glm::mat4 matTranslate = glm::translate(rigidBody.m_v3Position);
 
