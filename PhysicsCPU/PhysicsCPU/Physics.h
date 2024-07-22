@@ -51,6 +51,52 @@ namespace PhysicsCPU
 
             glm::vec3 m_v3LocalMin;
             glm::vec3 m_v3LocalMax;
+
+            void Update() 
+            {
+                m_v3LocalMin = glm::vec3(+FLT_MAX, +FLT_MAX, +FLT_MAX);
+                m_v3LocalMax = glm::vec3(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+                for (int i = 0; i < m_listTriangles.size(); i++)
+                {
+                    Triangle *pTri = &(m_listTriangles[i]);
+
+                    glm::vec3 v3A = m_listVertices[pTri->m_nAId];
+                    glm::vec3 v3B = m_listVertices[pTri->m_nBId];
+                    glm::vec3 v3C = m_listVertices[pTri->m_nCId];
+
+                    // calculate normals
+                    pTri->m_v3Normal = glm::normalize(glm::cross(v3B - v3A, v3C - v3A));
+
+                    // min/max
+                    // -> A
+                    m_v3LocalMin.x = std::fmin(m_v3LocalMin.x, v3A.x);
+                    m_v3LocalMin.y = std::fmin(m_v3LocalMin.y, v3A.y);
+                    m_v3LocalMin.z = std::fmin(m_v3LocalMin.z, v3A.z);
+
+                    m_v3LocalMax.x = std::fmax(m_v3LocalMax.x, v3A.x);
+                    m_v3LocalMax.y = std::fmax(m_v3LocalMax.y, v3A.y);
+                    m_v3LocalMax.z = std::fmax(m_v3LocalMax.z, v3A.z);
+
+                    // -> B
+                    m_v3LocalMin.x = std::fmin(m_v3LocalMin.x, v3B.x);
+                    m_v3LocalMin.y = std::fmin(m_v3LocalMin.y, v3B.y);
+                    m_v3LocalMin.z = std::fmin(m_v3LocalMin.z, v3B.z);
+                   
+                    m_v3LocalMax.x = std::fmax(m_v3LocalMax.x, v3B.x);
+                    m_v3LocalMax.y = std::fmax(m_v3LocalMax.y, v3B.y);
+                    m_v3LocalMax.z = std::fmax(m_v3LocalMax.z, v3B.z);
+
+                    // -> C
+                    m_v3LocalMin.x = std::fmin(m_v3LocalMin.x, v3C.x);
+                    m_v3LocalMin.y = std::fmin(m_v3LocalMin.y, v3C.y);
+                    m_v3LocalMin.z = std::fmin(m_v3LocalMin.z, v3C.z);
+                    
+                    m_v3LocalMax.x = std::fmax(m_v3LocalMax.x, v3C.x);
+                    m_v3LocalMax.y = std::fmax(m_v3LocalMax.y, v3C.y);
+                    m_v3LocalMax.z = std::fmax(m_v3LocalMax.z, v3C.z);
+                }
+            }
         };
 
         struct RigidBody
