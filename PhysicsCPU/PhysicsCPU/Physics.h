@@ -5,10 +5,11 @@
 #include <string>
 #include <execution>
 
-#include "glm.hpp"
-#include "gtc/matrix_transform.hpp"
-#include "gtx/euler_angles.hpp"
-#include "gtx/vector_angle.hpp"
+#include "glm/glm.hpp"
+#include "glm/ext.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtx/euler_angles.hpp"
+#include "glm/gtx/vector_angle.hpp"
 
 namespace PhysicsCPU 
 {
@@ -49,8 +50,8 @@ namespace PhysicsCPU
             std::vector<glm::vec3> m_listVertices;
             std::vector<Triangle> m_listTriangles;
 
-            glm::vec3 m_v3LocalMin;
-            glm::vec3 m_v3LocalMax;
+            glm::vec3 m_v3LocalMin = glm::vec3(0, 0, 0);
+            glm::vec3 m_v3LocalMax = glm::vec3(0, 0, 0);
 
             void Update() 
             {
@@ -238,17 +239,22 @@ namespace PhysicsCPU
             return &(m_listRigidBodies[nId]);
         }
 
+        int32_t NumRigidBodies() 
+        {
+            return (int32_t)m_listRigidBodies.size();
+        }
+
     private:
         void FixedUpdate() 
         {
             Integrate();
             UpdateTransforms();
 
-            UpdateBVHTree();
+            //UpdateBVHTree();
 
-            CollisionDetection();
-            CollisionResponse();
-            UpdateTransforms();
+            //CollisionDetection();
+            //CollisionResponse();
+            //UpdateTransforms();
         }
 
         void Integrate()
@@ -278,12 +284,16 @@ namespace PhysicsCPU
                     rigidBody.m_v3AngularVelocity += rigidBody.m_v3AngularAcceleration * dt;
                     
                     // damping
-                    rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, dt);
-                    rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, dt);
+                    //rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, dt);
+                    //rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, dt);
 
                     // axis, angle
                     float fDeltaAngle = glm::length(rigidBody.m_v3AngularVelocity) * dt;
-                    glm::vec3 v3RotationAxis = glm::normalize(rigidBody.m_v3AngularVelocity);
+                    glm::vec3 v3RotationAxis = glm::vec3(1, 0, 0);
+                    if (glm::length(rigidBody.m_v3AngularVelocity) > 0.0001f) 
+                    {
+                        v3RotationAxis = glm::normalize(rigidBody.m_v3AngularVelocity);
+                    }
                     rigidBody.m_v3Axis = glm::normalize(glm::rotate(rigidBody.m_v3Axis, fDeltaAngle, v3RotationAxis));
                     rigidBody.m_fAngle += fDeltaAngle;
                 }

@@ -9,10 +9,19 @@ GLFWwindow* pWindow;
 using namespace PhysicsCPU;
 Physics* pPhysics = NULL;
 
+float m_fElapsedTime = 0.0f;
+float m_fCurrentTime = 0.0f;
+int nFPS = 0;
+float fSec = 0.0f;
+
 bool Init() 
 {
+	glEnable(GL_DEPTH_TEST);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
 	pPhysics = new Physics();
-	pPhysics->SetGravity(glm::vec3(0, -1, 0));
+	pPhysics->SetGravity(glm::vec3(0, -1.0f, 0));
 
 	int matId = pPhysics->GenMaterial();
 	Physics::Material* pMaterial = pPhysics->GetMaterial(matId);
@@ -93,7 +102,7 @@ bool Init()
 
 	int bodyId = pPhysics->GenRigidBody();
 	Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(bodyId);
-	pRigidBody->m_fMass = 0.0f;
+	pRigidBody->m_fMass = 1.0f;
 	pRigidBody->m_v3Position = glm::vec3(0, 0, 0);
 	pRigidBody->m_v3Axis = glm::vec3(1, 0, 0);
 	pRigidBody->m_fAngle = 0.0f;
@@ -109,8 +118,71 @@ void Exit()
 	pPhysics = NULL;
 }
 
+void DebugDraw()
+{
+	glPushMatrix();
+	glBegin(GL_TRIANGLES);
+
+	glColor4f(1.0f, 0, 0, 1.0f);
+
+	for (int i = 0; i < pPhysics->NumRigidBodies(); i++)
+	{
+		struct Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(i);
+		struct Physics::ConvexTriMesh* pConvexTriMesh = pPhysics->GetConvexTriMesh(pRigidBody->m_nConvexTriMeshId);
+		
+		for (int j = 0; j < (int)pConvexTriMesh->m_listTriangles.size(); j++)
+		{
+			struct Physics::Triangle* pTriangle = &(pConvexTriMesh->m_listTriangles[j]);
+		
+			glm::vec3 v3LocalA = pConvexTriMesh->m_listVertices[pTriangle->m_nAId];
+			glm::vec3 v3LocalB = pConvexTriMesh->m_listVertices[pTriangle->m_nBId];
+			glm::vec3 v3LocalC = pConvexTriMesh->m_listVertices[pTriangle->m_nCId];
+		
+			glm::vec3 v3A = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalA, 1));
+			glm::vec3 v3B = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalB, 1));
+			glm::vec3 v3C = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalC, 1));
+		
+			glVertex3f(v3A.x, v3A.y, v3A.z);
+			glVertex3f(v3B.x, v3B.y, v3B.z);
+			glVertex3f(v3C.x, v3C.y, v3C.z);
+		}
+
+	}
+
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+	glEnd();
+	glPopMatrix();
+}
+
 void Update() 
 {
+	// update
+	// delta time
+	m_fElapsedTime = m_fCurrentTime;
+	m_fCurrentTime = (float)glfwGetTime();
+	float dt = m_fCurrentTime - m_fElapsedTime;
+
+	if (dt <= 0.0f) { dt = 1.0f / 60.0f; }
+	if (dt > (1.0f / 10.0f)){ dt = 1.0f / 10.0f; }
+
+	// fps
+	// print fps
+	nFPS++;
+	fSec += dt;
+	if (fSec >= 1.0f)
+	{
+		std::string strTitle = "FPS: " + std::to_string(nFPS);
+		glfwSetWindowTitle(pWindow, strTitle.c_str());
+
+		nFPS = 0;
+		fSec = 0.0f;
+	}
+
+	// physics
+	pPhysics->Update(dt);
+
+	// draw
 	int nWidth, nHeight;
 	glfwGetFramebufferSize(pWindow, &nWidth, &nHeight);
 	glViewport(0, 0, nWidth, nHeight);
@@ -118,7 +190,21 @@ void Update()
 	glClearColor(0.5f, 0.5f, 1.0f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	;
+	// camera
+	glm::vec3 v3CameraPos = glm::vec3(5, 0, 0);
+	glm::vec3 v3CameraAt = glm::vec3(0, 0, 0);
+	glm::vec3 v3CameraDir = glm::normalize(v3CameraAt - v3CameraPos);
+	glm::mat4 matCameraView = glm::lookAtRH(v3CameraPos, v3CameraAt, glm::vec3(0, 1, 0));
+	glm::mat4 matCameraProj = glm::perspectiveRH(glm::radians(45.0f), (float)nWidth / (float)nHeight, 0.01f, 1000.0f);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadMatrixf(glm::value_ptr(matCameraProj));
+
+	glMatrixMode(GL_MODELVIEW);
+	glm::mat4 matWorld = glm::mat4(1.0f);
+	glLoadMatrixf(glm::value_ptr(matCameraView * matWorld));
+
+	DebugDraw();
 
 	glfwSwapBuffers(pWindow);
 	glfwPollEvents();
@@ -131,8 +217,8 @@ int main(int argc, char **argv)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-	int nWindowWidth = 1280;
-	int nWindowHeight = 720;
+	int nWindowWidth = 800;
+	int nWindowHeight = 600;
 	pWindow = glfwCreateWindow(nWindowWidth, nWindowHeight, "PhysicsCPU - Test01", NULL, NULL);
 	glfwMakeContextCurrent(pWindow);
 	glfwSwapInterval(0);
