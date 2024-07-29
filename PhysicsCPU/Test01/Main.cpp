@@ -14,30 +14,23 @@ float m_fCurrentTime = 0.0f;
 int nFPS = 0;
 float fSec = 0.0f;
 
-bool Init() 
+void CreateCube(glm::vec3 v3Position, glm::vec3 v3HalfSize, float fMass) 
 {
-	glEnable(GL_DEPTH_TEST);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-	pPhysics = new Physics();
-	pPhysics->SetGravity(glm::vec3(0, -1.0f, 0));
-
 	int matId = pPhysics->GenMaterial();
 	Physics::Material* pMaterial = pPhysics->GetMaterial(matId);
 	pMaterial->m_fRestitution = 0.0f;
 	pMaterial->m_fFriction = 0.0f;
 
 	int meshId = pPhysics->GenConvexTriMesh();
-	Physics::ConvexTriMesh *pMesh = pPhysics->GetConvexTriMesh(meshId);
-	pMesh->m_listVertices.push_back(glm::vec3(-1, -1, -1));
-	pMesh->m_listVertices.push_back(glm::vec3(+1, -1, -1));
-	pMesh->m_listVertices.push_back(glm::vec3(+1, +1, -1));
-	pMesh->m_listVertices.push_back(glm::vec3(-1, +1, -1));
-	pMesh->m_listVertices.push_back(glm::vec3(-1, -1, +1));
-	pMesh->m_listVertices.push_back(glm::vec3(+1, -1, +1));
-	pMesh->m_listVertices.push_back(glm::vec3(+1, +1, +1));
-	pMesh->m_listVertices.push_back(glm::vec3(-1, +1, +1));
+	Physics::ConvexTriMesh* pMesh = pPhysics->GetConvexTriMesh(meshId);
+	pMesh->m_listVertices.push_back(glm::vec3(-1 * v3HalfSize.x, -1 * v3HalfSize.y, -1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(+1 * v3HalfSize.x, -1 * v3HalfSize.y, -1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(+1 * v3HalfSize.x, +1 * v3HalfSize.y, -1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(-1 * v3HalfSize.x, +1 * v3HalfSize.y, -1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(-1 * v3HalfSize.x, -1 * v3HalfSize.y, +1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(+1 * v3HalfSize.x, -1 * v3HalfSize.y, +1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(+1 * v3HalfSize.x, +1 * v3HalfSize.y, +1 * v3HalfSize.z));
+	pMesh->m_listVertices.push_back(glm::vec3(-1 * v3HalfSize.x, +1 * v3HalfSize.y, +1 * v3HalfSize.z));
 	Physics::Triangle triBack1;
 	triBack1.m_nAId = 0;
 	triBack1.m_nBId = 1;
@@ -102,12 +95,25 @@ bool Init()
 
 	int bodyId = pPhysics->GenRigidBody();
 	Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(bodyId);
-	pRigidBody->m_fMass = 1.0f;
-	pRigidBody->m_v3Position = glm::vec3(0, 0, 0);
+	pRigidBody->m_fMass = fMass;
+	pRigidBody->m_v3Position = v3Position;
 	pRigidBody->m_v3Axis = glm::vec3(1, 0, 0);
 	pRigidBody->m_fAngle = 0.0f;
 	pRigidBody->m_nConvexTriMeshId = meshId;
 	pRigidBody->m_nMaterialId = matId;
+}
+
+bool Init() 
+{
+	glEnable(GL_DEPTH_TEST);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	pPhysics = new Physics();
+	pPhysics->SetGravity(glm::vec3(0, -1.0f, 0));
+
+	CreateCube(glm::vec3(0, 0, 0), glm::vec3(3, 0.1f, 3), 0.0f);
+	CreateCube(glm::vec3(0, 5, 0), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	return true;
 }
@@ -191,7 +197,7 @@ void Update()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// camera
-	glm::vec3 v3CameraPos = glm::vec3(5, 0, 0);
+	glm::vec3 v3CameraPos = glm::vec3(5, 3, 0);
 	glm::vec3 v3CameraAt = glm::vec3(0, 0, 0);
 	glm::vec3 v3CameraDir = glm::normalize(v3CameraAt - v3CameraPos);
 	glm::mat4 matCameraView = glm::lookAtRH(v3CameraPos, v3CameraAt, glm::vec3(0, 1, 0));

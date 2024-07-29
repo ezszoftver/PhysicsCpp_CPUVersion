@@ -8,8 +8,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Physics.h" />
+    <ClInclude Include="Plane.h" />
+    <ClInclude Include="Line.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Physics.cpp" />
+    <ClCompile Include="Plane.cpp" />
+    <ClCompile Include="Line.cpp" />
   </ItemGroup>
 </Project>

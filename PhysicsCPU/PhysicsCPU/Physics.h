@@ -11,11 +11,16 @@
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtx/vector_angle.hpp"
 
+#include "Plane.h"
+#include "Line.h"
+
 namespace PhysicsCPU 
 {
 	class Physics
 	{
 	private:
+        const float PI = 3.14159265358979323846f;
+
         struct Common
         {
             glm::vec3 m_v3Gravity;
@@ -250,11 +255,11 @@ namespace PhysicsCPU
             Integrate();
             UpdateTransforms();
 
-            //UpdateBVHTree();
+            UpdateBVHTree();
 
-            //CollisionDetection();
-            //CollisionResponse();
-            //UpdateTransforms();
+            CollisionDetection();
+            CollisionResponse();
+            UpdateTransforms();
         }
 
         void Integrate()
@@ -320,8 +325,227 @@ namespace PhysicsCPU
         {
         }
 
+        void GetMinMax(RigidBody *pRigidBody, Plane *pPlane, float *p_fMin, float *p_fMax)
+        {
+            *p_fMin = +FLT_MAX;
+            *p_fMax = -FLT_MAX;
+
+            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
+
+            for (int i = 0; i < (int)pConvexTriMesh->m_listVertices.size(); i++) 
+            {
+                glm::vec3 v3LocalPos = pConvexTriMesh->m_listVertices[i];
+                glm::vec3 v3Pos = pRigidBody->m_matWorld * glm::vec4(v3LocalPos, 1.0f);
+
+                float t = pPlane->GetDistance(v3Pos);
+
+                if (t < (*p_fMin)) { (*p_fMin) = t; }
+                if (t > (*p_fMax)) { (*p_fMax) = t; }
+            }
+        }
+
+        bool IsParallel(glm::vec3 v3Dir1, glm::vec3 v3Dir2) 
+        {
+            float fAngle = glm::angle(v3Dir1, v3Dir2);
+            return (std::fabs(fAngle) < 0.1f) || (std::fabs(fAngle - PI) < 0.1f);
+        }
+
+        glm::vec4 SAT(RigidBody* pRigidBody1, RigidBody* pRigidBody2) 
+        {
+            struct ConvexTriMesh* pConvexTriMesh1 = &(m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId]);
+            struct ConvexTriMesh* pConvexTriMesh2 = &(m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId]);
+
+            glm::vec3 v3Dir = glm::vec3(0, 0, 0);
+            float fMinPenetration = FLT_MAX;
+
+            // 1/3 plane-point
+            for (int i = 0; i < (int)pConvexTriMesh1->m_listTriangles.size(); i++)
+            {
+                glm::vec3 v3LocalPos = pRigidBody1->m_v3Position;
+                glm::vec3 v3LocalNormal = pConvexTriMesh1->m_listTriangles[i].m_v3Normal;
+                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
+
+                Plane plane(v3LocalPos, v3Normal);
+
+                float fMin1, fMax1;
+                GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
+                float fMin2, fMax2;
+                GetMinMax(pRigidBody2, &plane, &fMin2, &fMax2);
+
+                float fGlobalMin = (fMin1 < fMin2) ? fMin1 : fMin2;
+                float fGlobalMax = (fMax1 > fMax2) ? fMax1 : fMax2;
+                float fGlobalDistance = fGlobalMax - fGlobalMin;
+                float fDist1 = fMax1 - fMin1;
+                float fDist2 = fMax2 - fMin2;
+
+                if (fGlobalDistance > (fDist1 + fDist2)) 
+                {
+                    return glm::vec4(0, 0, 0, 0);
+                }
+
+                float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
+                if (fPenetration < fMinPenetration)
+                {
+                    fMinPenetration = fPenetration;
+                    v3Dir = plane.m_v3Normal;
+                }
+
+            }
+
+            // 2/3 plane-point
+            for (int i = 0; i < (int)pConvexTriMesh2->m_listTriangles.size(); i++)
+            {
+                glm::vec3 v3LocalPos = pRigidBody2->m_v3Position;
+                glm::vec3 v3LocalNormal = pConvexTriMesh2->m_listTriangles[i].m_v3Normal;
+                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
+
+                Plane plane(v3LocalPos, v3Normal);
+
+                float fMin1, fMax1;
+                GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
+                float fMin2, fMax2;
+                GetMinMax(pRigidBody2, &plane, &fMin2, &fMax2);
+
+                float fGlobalMin = (fMin1 < fMin2) ? fMin1 : fMin2;
+                float fGlobalMax = (fMax1 > fMax2) ? fMax1 : fMax2;
+                float fGlobalDistance = fGlobalMax - fGlobalMin;
+                float fDist1 = fMax1 - fMin1;
+                float fDist2 = fMax2 - fMin2;
+
+                if (fGlobalDistance > (fDist1 + fDist2))
+                {
+                    return glm::vec4(0, 0, 0, 0);
+                }
+
+                float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
+                if (fPenetration < fMinPenetration)
+                {
+                    fMinPenetration = fPenetration;
+                    v3Dir = plane.m_v3Normal;
+                }
+
+            }
+
+            // 3/3 edge-edge
+            glm::vec3 v3LocalPos = pRigidBody1->m_v3Position;
+            for (int i = 0; i < (int)pConvexTriMesh1->m_listTriangles.size(); i++) 
+            {
+                glm::vec3 v3LocalA = pConvexTriMesh1->m_listVertices[ pConvexTriMesh1->m_listTriangles[i].m_nAId ];
+                glm::vec3 v3LocalB = pConvexTriMesh1->m_listVertices[ pConvexTriMesh1->m_listTriangles[i].m_nBId ];
+                glm::vec3 v3LocalC = pConvexTriMesh1->m_listVertices[ pConvexTriMesh1->m_listTriangles[i].m_nCId ];
+
+                glm::vec3 v3RB1A = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalA, 1.0f));
+                glm::vec3 v3RB1B = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalB, 1.0f));
+                glm::vec3 v3RB1C = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalC, 1.0f));
+
+                Line lines1[3] =
+                {
+                    Line(v3RB1A, v3RB1B),
+                    Line(v3RB1B, v3RB1C),
+                    Line(v3RB1C, v3RB1A)
+                };
+
+                for (int j = 0; j < (int)pConvexTriMesh2->m_listTriangles.size(); j++)
+                {
+                    glm::vec3 v3LocalPos = pRigidBody2->m_v3Position;
+                    glm::vec3 v3LocalA = pConvexTriMesh2->m_listVertices[pConvexTriMesh2->m_listTriangles[j].m_nAId];
+                    glm::vec3 v3LocalB = pConvexTriMesh2->m_listVertices[pConvexTriMesh2->m_listTriangles[j].m_nBId];
+                    glm::vec3 v3LocalC = pConvexTriMesh2->m_listVertices[pConvexTriMesh2->m_listTriangles[j].m_nCId];
+
+                    glm::vec3 v3RB2A = glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalA, 1.0f));
+                    glm::vec3 v3RB2B = glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalB, 1.0f));
+                    glm::vec3 v3RB2C = glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalC, 1.0f));
+
+                    Line lines2[3] =
+                    {
+                        Line(v3RB2A, v3RB2B),
+                        Line(v3RB2B, v3RB2C),
+                        Line(v3RB2C, v3RB2A)
+                    };
+
+                    for (int i2 = 0; i2 < 3; i2++) 
+                    {
+                        for (int j2 = 0; j2 < 3; j2++) 
+                        {
+                            glm::vec3 v3Dir1 = lines1[i2].GetDir();
+                            glm::vec3 v3Dir2 = lines2[j2].GetDir();
+
+                            if (true == IsParallel(v3Dir1, v3Dir2))
+                            {
+                                continue;
+                            }
+
+                            glm::vec3 v3Normal = glm::normalize(glm::cross(v3Dir1, v3Dir2));
+
+                            Plane plane(v3LocalPos, v3Normal);
+
+                            float fMin1, fMax1;
+                            GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
+                            float fMin2, fMax2;
+                            GetMinMax(pRigidBody2, &plane, &fMin2, &fMax2);
+
+                            float fGlobalMin = (fMin1 < fMin2) ? fMin1 : fMin2;
+                            float fGlobalMax = (fMax1 > fMax2) ? fMax1 : fMax2;
+                            float fGlobalDistance = fGlobalMax - fGlobalMin;
+                            float fDist1 = fMax1 - fMin1;
+                            float fDist2 = fMax2 - fMin2;
+
+                            if (fGlobalDistance > (fDist1 + fDist2))
+                            {
+                                return glm::vec4(0, 0, 0, 0);
+                            }
+
+                            float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
+                            if (fPenetration < fMinPenetration)
+                            {
+                                fMinPenetration = fPenetration;
+                                v3Dir = plane.m_v3Normal;
+                            }
+
+                        }
+                    }
+
+                }
+            }
+
+            return glm::vec4(v3Dir, fMinPenetration);
+        }
+
+        bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2) 
+        {
+            glm::vec4 v4Result = SAT(pRigidBody1, pRigidBody2);
+            glm::vec3 v3Dir = glm::vec3(v4Result.x, v4Result.y, v4Result.z);
+            float fPenetration = v4Result.w;
+
+            if (glm::length(v3Dir) > 0.001f)
+            {
+                //printf("Coll true; penetration: %f\n", fPenetration);
+            }
+            else 
+            {
+                //printf("Coll false\n");
+            }
+            
+            return false;
+        }
+
         void CollisionDetection() 
         {
+            for (int i = 0; i < m_listRigidBodies.size(); i++)
+            {
+                struct RigidBody *pRigidBody1 = &(m_listRigidBodies[i]);
+
+                for (int j = 0; j < m_listRigidBodies.size(); j++) 
+                {
+                    struct RigidBody* pRigidBody2 = &(m_listRigidBodies[j]);
+
+                    if (i != j) 
+                    {
+                        CollisionDetection(pRigidBody1, pRigidBody2);
+                    }
+
+                }
+            }
         }
 
         void CollisionResponse() 
