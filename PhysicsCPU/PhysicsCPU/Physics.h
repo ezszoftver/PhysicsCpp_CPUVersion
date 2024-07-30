@@ -618,6 +618,54 @@ namespace PhysicsCPU
             }
         }
 
+        void GeneratePlanes(RigidBody* pRigidBody, std::vector<Triangle*> *pListTriangles, std::vector<Plane> *pListPlanes)
+        {
+            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
+
+            for (int i = 0; i < (int)(*pListTriangles).size(); i++) 
+            {
+                Triangle* pTriangle = (*pListTriangles)[i];
+
+                glm::vec3 v3LocalA = pConvexTriMesh->m_listVertices[pTriangle->m_nAId];
+                glm::vec3 v3LocalB = pConvexTriMesh->m_listVertices[pTriangle->m_nBId];
+                glm::vec3 v3LocalC = pConvexTriMesh->m_listVertices[pTriangle->m_nCId];
+
+                glm::vec3 v3A = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalA, 1.0f)));
+                glm::vec3 v3B = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalB, 1.0f)));
+                glm::vec3 v3C = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalC, 1.0f)));
+
+                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(pTriangle->m_v3Normal, 0.0f)));
+
+                // front
+                Plane planeFront;
+                planeFront.m_v3Pos = v3A;
+                planeFront.m_v3Normal = v3Normal;
+                
+                // a
+                Plane planeA;
+                glm::vec3 v3AB = glm::normalize(v3B - v3A);
+                planeA.m_v3Normal = glm::normalize(glm::cross(v3AB, v3Normal));
+                planeA.m_v3Pos = v3A;
+
+                // b
+                Plane planeB;
+                glm::vec3 v3BC = glm::normalize(v3C - v3B);
+                planeB.m_v3Normal = glm::normalize(glm::cross(v3BC, v3Normal));
+                planeB.m_v3Pos = v3B;
+
+                // c
+                Plane planeC;
+                glm::vec3 v3CA = glm::normalize(v3A - v3C);
+                planeC.m_v3Normal = glm::normalize(glm::cross(v3CA, v3Normal));
+                planeC.m_v3Pos = v3C;
+
+                (*pListPlanes).push_back(planeFront);
+                (*pListPlanes).push_back(planeA);
+                (*pListPlanes).push_back(planeB);
+                (*pListPlanes).push_back(planeC);
+            }
+        }
+
         bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2) 
         {
             glm::vec4 v4Result = SAT(pRigidBody1, pRigidBody2);
@@ -653,11 +701,16 @@ namespace PhysicsCPU
             }
 
             // Find same triangles
-            std::vector<Triangle*> listRB1Triangles;
-            std::vector<Triangle*> listRB2Triangles;
-            FindSameTriangles(pRigidBody1, pRB1BestTriangle, &listRB1Triangles);
-            FindSameTriangles(pRigidBody2, pRB2BestTriangle, &listRB2Triangles);
+            std::vector<Triangle*> listRB1LocalTriangles;
+            std::vector<Triangle*> listRB2LocalTriangles;
+            FindSameTriangles(pRigidBody1, pRB1BestTriangle, &listRB1LocalTriangles);
+            FindSameTriangles(pRigidBody2, pRB2BestTriangle, &listRB2LocalTriangles);
 
+            // Generate planes
+            std::vector<Plane> listRB1Planes;
+            std::vector<Plane> listRB2Planes;
+            GeneratePlanes(pRigidBody1, &listRB1LocalTriangles, &listRB1Planes);
+            GeneratePlanes(pRigidBody2, &listRB2LocalTriangles, &listRB2Planes);
             //Physics::IntersectPlaneLine
 
             return false;

@@ -10,6 +10,12 @@ namespace PhysicsCPU
 		glm::vec3 m_v3Pos;
 		glm::vec3 m_v3Normal;
 
+		Plane() 
+		{
+			m_v3Pos = glm::vec3(0, 0, 0);
+			m_v3Normal = glm::vec3(0, 0, 0);
+		}
+
 		Plane(glm::vec3 v3Pos, glm::vec3 v3Normal) 
 		{
 			m_v3Pos = v3Pos;
