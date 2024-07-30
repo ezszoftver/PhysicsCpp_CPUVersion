@@ -26,6 +26,26 @@ namespace PhysicsCPU
             return ((std::fabs(fAngle) < 0.1f) || (std::fabs(fAngle) > 179.9f));
         }
 
+        static bool IntersectPlaneLine(struct RigidBody *pRigidBody, Plane* pPlane, Line* pLine, glm::vec3 *pRet)
+        {
+            float denom = glm::dot(pPlane->m_v3Normal, pLine->GetDir());
+
+            if (glm::abs(denom) > 0.001f) 
+            {
+                float t = glm::dot(pPlane->m_v3Pos - pLine->m_v3A, pPlane->m_v3Normal) / denom;
+
+                if (t < 0.0f) { return false; }
+                glm::vec3 v3IntersectPoint = pLine->m_v3A + (t * pLine->GetDir());
+                float t_max = glm::distance(pLine->m_v3A, v3IntersectPoint);
+                if (t > t_max) { return false; }
+
+                (*pRet) = v3IntersectPoint;
+                return true;
+            }
+
+            return false;
+        }
+
         struct Common
         {
             glm::vec3 m_v3Gravity;
@@ -554,21 +574,92 @@ namespace PhysicsCPU
             return glm::vec4(v3Dir, fMinPenetration);
         }
 
+        Triangle* FindBestTriangle(RigidBody* pRigidBody, glm::vec3 v3Dir) 
+        {
+            Triangle* pRet = nullptr;
+
+            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
+
+            for (int i = 0; i < (int)pConvexTriMesh->m_listTriangles.size(); i++)
+            {
+                Triangle *pTriangle = &(pConvexTriMesh->m_listTriangles[i]);
+                glm::vec3 v3LocalNormal = pTriangle->m_v3Normal;
+                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
+
+                if (nullptr == pRet) { pRet = pTriangle; }
+                else if (glm::angle(v3Dir, v3Normal) < glm::angle(v3Dir, pRet->m_v3Normal))
+                {
+                    pRet = pTriangle;
+                }
+            }
+
+            return pRet;
+        }
+
+        void FindSameTriangles(RigidBody* pRigidBody, Triangle* pBestTriangle, std::vector<Triangle*>* pRet) 
+        {
+            glm::vec3 v3BestNormal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(pBestTriangle->m_v3Normal, 0.0f)));
+
+            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
+
+            for (int i = 0; i < (int)pConvexTriMesh->m_listTriangles.size(); i++)
+            {
+                Triangle* pTriangle = &(pConvexTriMesh->m_listTriangles[i]);
+                glm::vec3 v3LocalNormal = pTriangle->m_v3Normal;
+                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
+
+                float fAngle = glm::angle(v3BestNormal, v3Normal);
+
+                if (fAngle < glm::radians(0.1f)) 
+                {
+                    (*pRet).push_back(pTriangle);
+                }
+
+            }
+        }
+
         bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2) 
         {
             glm::vec4 v4Result = SAT(pRigidBody1, pRigidBody2);
             glm::vec3 v3Dir = glm::vec3(v4Result.x, v4Result.y, v4Result.z);
             float fPenetration = v4Result.w;
 
-            if (glm::length(v3Dir) > 0.001f)
-            {
-                printf("Coll true; penetration: %f\n", fPenetration);
-            }
-            else 
+            if (glm::length(v3Dir) < 0.001f)
             {
                 //printf("Coll false\n");
+                return false;
             }
-            
+
+            // Find best triangle
+            glm::vec3 v3RB1Dir;
+            {
+                glm::vec3 v3ToRB2 = glm::normalize(pRigidBody2->m_v3Position - pRigidBody1->m_v3Position);
+                if (glm::angle(v3Dir, v3ToRB2) < glm::radians(90.0f)) { v3RB1Dir = v3Dir; }
+                else { v3RB1Dir = -v3Dir; }
+            }
+
+            glm::vec3 v3RB2Dir;
+            {
+                glm::vec3 v3ToRB1 = glm::normalize(pRigidBody1->m_v3Position - pRigidBody2->m_v3Position);
+                if (glm::angle(v3Dir, v3ToRB1) < glm::radians(90.0f)) { v3RB2Dir = v3Dir; }
+                else { v3RB2Dir = -v3Dir; }
+            }
+
+            Triangle *pRB1BestTriangle = FindBestTriangle(pRigidBody1, v3RB1Dir);
+            Triangle *pRB2BestTriangle = FindBestTriangle(pRigidBody2, v3RB2Dir);
+            if (nullptr == pRB1BestTriangle || nullptr == pRB2BestTriangle)
+            {
+                return false;
+            }
+
+            // Find same triangles
+            std::vector<Triangle*> listRB1Triangles;
+            std::vector<Triangle*> listRB2Triangles;
+            FindSameTriangles(pRigidBody1, pRB1BestTriangle, &listRB1Triangles);
+            FindSameTriangles(pRigidBody2, pRB2BestTriangle, &listRB2Triangles);
+
+            //Physics::IntersectPlaneLine
+
             return false;
         }
 
