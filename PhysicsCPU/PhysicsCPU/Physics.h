@@ -707,7 +707,7 @@ namespace PhysicsCPU
             for (int i = 0; i < (int)(*pListPlanes).size(); i++)
             {
                 Plane plane = (*pListPlanes)[i];
-                if (plane.GetDistance(v3Point) > 0.0001) 
+                if (plane.GetDistance(v3Point) > 0.001f) 
                 {
                     return false;
                 }
@@ -785,6 +785,9 @@ namespace PhysicsCPU
                     Line* pLines2 = &(listRB2Lines[j * 3]);
 
                     GenerateHits(pRigidBody1, pRigidBody2, separatePlane, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2);
+
+                    Plane negativeSeparatePlane = Plane(separatePlane.m_v3Pos, -separatePlane.m_v3Normal);
+                    GenerateHits(pRigidBody2, pRigidBody1, negativeSeparatePlane, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1);
                 }
             }
 
