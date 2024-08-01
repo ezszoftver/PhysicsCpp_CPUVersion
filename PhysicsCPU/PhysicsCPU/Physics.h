@@ -75,6 +75,49 @@ namespace PhysicsCPU
             glm::vec3 m_v3Normal;
         };
 
+        struct RigidBody
+        {
+            float m_fMass;
+
+            glm::vec3 m_v3Force;
+            glm::vec3 m_v3LinearAcceleration;
+            glm::vec3 m_v3LinearVelocity;
+            glm::vec3 m_v3Position;
+
+            glm::vec3 m_v3Torque;
+            glm::vec3 m_v3AngularAcceleration;
+            glm::vec3 m_v3AngularVelocity;
+            glm::vec3 m_v3Axis;
+            float m_fAngle;
+
+            float m_fLinearDamping;
+            float m_fAngularDamping;
+
+            glm::mat4x4 m_matWorld;
+
+            int32_t m_nConvexTriMeshId;
+            int16_t m_nMaterialId;
+        };
+
+        struct Hit 
+        {
+            RigidBody *m_pRigidBody1 = nullptr;
+            RigidBody *m_pRigidBody2 = nullptr;
+
+            glm::vec3 m_v3PointInWorld = glm::vec3(0, 0, 0);
+            float m_fPenetration = 0.0;
+        };
+
+        struct Hits 
+        {
+            std::vector<struct Hit> m_listHits;
+
+            void Clear() 
+            {
+                m_listHits.clear();
+            }
+        };
+
         struct ConvexTriMesh
         {
             std::vector<glm::vec3> m_listVertices;
@@ -210,34 +253,11 @@ namespace PhysicsCPU
             }
         };
 
-        struct RigidBody
-        {
-            float m_fMass;
-
-            glm::vec3 m_v3Force;
-            glm::vec3 m_v3LinearAcceleration;
-            glm::vec3 m_v3LinearVelocity;
-            glm::vec3 m_v3Position;
-
-            glm::vec3 m_v3Torque;
-            glm::vec3 m_v3AngularAcceleration;
-            glm::vec3 m_v3AngularVelocity;
-            glm::vec3 m_v3Axis;
-            float m_fAngle;
-
-            float m_fLinearDamping;
-            float m_fAngularDamping;
-
-            glm::mat4x4 m_matWorld;
-
-            int32_t m_nConvexTriMeshId;
-            int16_t m_nMaterialId;
-        };
-
         struct Common m_common;
         std::vector<struct Material> m_listMaterials;
         std::vector<struct ConvexTriMesh> m_listConvexTriMeshs;
         std::vector<struct RigidBody> m_listRigidBodies;
+        std::vector<struct Hits> m_listHits;
 
         Physics(int16_t nFps = 60)
         {
@@ -340,6 +360,9 @@ namespace PhysicsCPU
             rigidBody.m_nConvexTriMeshId = -1;
             rigidBody.m_nMaterialId = -1;
             m_listRigidBodies.push_back(rigidBody);
+
+            struct Hits hits;
+            m_listHits.push_back(hits);
 
             return nId;
         }
@@ -449,12 +472,12 @@ namespace PhysicsCPU
             }
         }
 
-        glm::vec4 SAT(RigidBody* pRigidBody1, RigidBody* pRigidBody2) 
+        Plane SAT(RigidBody* pRigidBody1, RigidBody* pRigidBody2) 
         {
             struct ConvexTriMesh* pConvexTriMesh1 = &(m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId]);
             struct ConvexTriMesh* pConvexTriMesh2 = &(m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId]);
 
-            glm::vec3 v3Dir = glm::vec3(0, 0, 0);
+            Plane ret = Plane();
             float fMinPenetration = FLT_MAX;
 
             // 1/3 plane-point
@@ -462,9 +485,10 @@ namespace PhysicsCPU
             {
                 glm::vec3 v3LocalPos = pRigidBody1->m_v3Position;
                 glm::vec3 v3LocalNormal = pConvexTriMesh1->m_listUniqueNormals[i];
+                glm::vec3 v3Pos = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalPos, 1.0f));
                 glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
 
-                Plane plane(v3LocalPos, v3Normal);
+                Plane plane(v3Pos, v3Normal);
 
                 float fMin1, fMax1;
                 GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
@@ -479,14 +503,14 @@ namespace PhysicsCPU
 
                 if (fGlobalDistance > (fDist1 + fDist2)) 
                 {
-                    return glm::vec4(0, 0, 0, 0);
+                    return Plane();
                 }
 
                 float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
                 if (fPenetration < fMinPenetration)
                 {
                     fMinPenetration = fPenetration;
-                    v3Dir = plane.m_v3Normal;
+                    ret = plane;
                 }
 
             }
@@ -496,6 +520,7 @@ namespace PhysicsCPU
             {
                 glm::vec3 v3LocalPos = pRigidBody2->m_v3Position;
                 glm::vec3 v3LocalNormal = pConvexTriMesh2->m_listUniqueNormals[i];
+                glm::vec3 v3Pos = glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalPos, 1.0f));
                 glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
 
                 Plane plane(v3LocalPos, v3Normal);
@@ -513,20 +538,21 @@ namespace PhysicsCPU
 
                 if (fGlobalDistance > (fDist1 + fDist2))
                 {
-                    return glm::vec4(0, 0, 0, 0);
+                    return Plane();
                 }
 
                 float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
                 if (fPenetration < fMinPenetration)
                 {
                     fMinPenetration = fPenetration;
-                    v3Dir = plane.m_v3Normal;
+                    ret = plane;
                 }
 
             }
 
             // 3/3 edge-edge
             glm::vec3 v3LocalPos = pRigidBody1->m_v3Position;
+            glm::vec3 v3Pos = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalPos, 1.0f));
             for (int i = 0; i < (int)pConvexTriMesh1->m_listUniqueEdges.size(); i++) 
             {
                 glm::vec3 v3LocalDir = pConvexTriMesh1->m_listUniqueEdges[i];
@@ -544,7 +570,7 @@ namespace PhysicsCPU
 
                     glm::vec3 v3Normal = glm::normalize(glm::cross(v3Dir1, v3Dir2));
 
-                    Plane plane(v3LocalPos, v3Normal);
+                    Plane plane(v3Pos, v3Normal);
 
                     float fMin1, fMax1;
                     GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
@@ -559,19 +585,19 @@ namespace PhysicsCPU
 
                     if (fGlobalDistance > (fDist1 + fDist2))
                     {
-                        return glm::vec4(0, 0, 0, 0);
+                        return Plane();
                     }
 
                     float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
                     if (fPenetration < fMinPenetration)
                     {
                         fMinPenetration = fPenetration;
-                        v3Dir = plane.m_v3Normal;
+                        ret = plane;
                     }
                 }
             }
 
-            return glm::vec4(v3Dir, fMinPenetration);
+            return ret;
         }
 
         Triangle* FindBestTriangle(RigidBody* pRigidBody, glm::vec3 v3Dir) 
@@ -618,7 +644,7 @@ namespace PhysicsCPU
             }
         }
 
-        void GeneratePlanes(RigidBody* pRigidBody, std::vector<Triangle*> *pListTriangles, std::vector<Plane> *pListPlanes)
+        void GeneratePlanesAndLines(RigidBody* pRigidBody, std::vector<Triangle*> *pListTriangles, std::vector<Plane> *pListPlanes, std::vector<Line>* pListLines)
         {
             struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
 
@@ -630,9 +656,9 @@ namespace PhysicsCPU
                 glm::vec3 v3LocalB = pConvexTriMesh->m_listVertices[pTriangle->m_nBId];
                 glm::vec3 v3LocalC = pConvexTriMesh->m_listVertices[pTriangle->m_nCId];
 
-                glm::vec3 v3A = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalA, 1.0f)));
-                glm::vec3 v3B = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalB, 1.0f)));
-                glm::vec3 v3C = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalC, 1.0f)));
+                glm::vec3 v3A = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalA, 1.0f));
+                glm::vec3 v3B = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalB, 1.0f));
+                glm::vec3 v3C = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalC, 1.0f));
 
                 glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(pTriangle->m_v3Normal, 0.0f)));
 
@@ -659,46 +685,79 @@ namespace PhysicsCPU
                 planeC.m_v3Normal = glm::normalize(glm::cross(v3CA, v3Normal));
                 planeC.m_v3Pos = v3C;
 
+                // planes
                 (*pListPlanes).push_back(planeFront);
                 (*pListPlanes).push_back(planeA);
                 (*pListPlanes).push_back(planeB);
                 (*pListPlanes).push_back(planeC);
+
+                // lines
+                Line lineAB(v3B, v3A);
+                Line lineBC(v3C, v3B);
+                Line lineCA(v3A, v3C);
+
+                (*pListLines).push_back(lineAB);
+                (*pListLines).push_back(lineBC);
+                (*pListLines).push_back(lineCA);
             }
+        }
+
+        bool IsInside(glm::vec3 v3Point, std::vector<Plane>* pListPlanes) 
+        {
+            for (int i = 0; i < (int)(*pListPlanes).size(); i++)
+            {
+                Plane plane = (*pListPlanes)[i];
+                if (plane.GetDistance(v3Point) > 0.0001) 
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void ClearHits() 
+        {
+            for (int i = 0; i < m_listHits.size(); i++) 
+            {
+                m_listHits[i].Clear();
+            }
+        }
+
+        void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, Plane separatePlane, Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
+        {
         }
 
         bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2) 
         {
-            glm::vec4 v4Result = SAT(pRigidBody1, pRigidBody2);
-            glm::vec3 v3Dir = glm::vec3(v4Result.x, v4Result.y, v4Result.z);
-            float fPenetration = v4Result.w;
+            Plane separatePlane = SAT(pRigidBody1, pRigidBody2);
 
-            if (glm::length(v3Dir) < 0.001f)
+            if (glm::length(separatePlane.m_v3Normal) < 0.001f)
             {
                 //printf("Coll false\n");
                 return false;
+            }
+            else
+            {
+                //printf("Coll ok\n");
             }
 
             // Find best triangle
             glm::vec3 v3RB1Dir;
             {
                 glm::vec3 v3ToRB2 = glm::normalize(pRigidBody2->m_v3Position - pRigidBody1->m_v3Position);
-                if (glm::angle(v3Dir, v3ToRB2) < glm::radians(90.0f)) { v3RB1Dir = v3Dir; }
-                else { v3RB1Dir = -v3Dir; }
+                if (glm::angle(separatePlane.m_v3Normal, v3ToRB2) < glm::radians(90.0f)) { v3RB1Dir = separatePlane.m_v3Normal; }
+                else { v3RB1Dir = -separatePlane.m_v3Normal; }
             }
 
             glm::vec3 v3RB2Dir;
             {
                 glm::vec3 v3ToRB1 = glm::normalize(pRigidBody1->m_v3Position - pRigidBody2->m_v3Position);
-                if (glm::angle(v3Dir, v3ToRB1) < glm::radians(90.0f)) { v3RB2Dir = v3Dir; }
-                else { v3RB2Dir = -v3Dir; }
+                if (glm::angle(separatePlane.m_v3Normal, v3ToRB1) < glm::radians(90.0f)) { v3RB2Dir = separatePlane.m_v3Normal; }
+                else { v3RB2Dir = -separatePlane.m_v3Normal; }
             }
 
             Triangle *pRB1BestTriangle = FindBestTriangle(pRigidBody1, v3RB1Dir);
             Triangle *pRB2BestTriangle = FindBestTriangle(pRigidBody2, v3RB2Dir);
-            if (nullptr == pRB1BestTriangle || nullptr == pRB2BestTriangle)
-            {
-                return false;
-            }
 
             // Find same triangles
             std::vector<Triangle*> listRB1LocalTriangles;
@@ -709,15 +768,33 @@ namespace PhysicsCPU
             // Generate planes
             std::vector<Plane> listRB1Planes;
             std::vector<Plane> listRB2Planes;
-            GeneratePlanes(pRigidBody1, &listRB1LocalTriangles, &listRB1Planes);
-            GeneratePlanes(pRigidBody2, &listRB2LocalTriangles, &listRB2Planes);
+            std::vector<Line> listRB1Lines;
+            std::vector<Line> listRB2Lines;
+            GeneratePlanesAndLines(pRigidBody1, &listRB1LocalTriangles, &listRB1Planes, &listRB1Lines);
+            GeneratePlanesAndLines(pRigidBody2, &listRB2LocalTriangles, &listRB2Planes, &listRB2Lines);
+            
             //Physics::IntersectPlaneLine
+            for (int i = 0; i < (int)listRB1LocalTriangles.size(); i++)
+            {
+                Plane *pConvexPlanes1 = &(listRB1Planes[i * 4]);
+                Line* pLines1 = &(listRB1Lines[i * 3]);
+
+                for (int j = 0; j < (int)listRB2LocalTriangles.size(); j++)
+                {
+                    Plane* pConvexPlanes2 = &(listRB2Planes[j * 4]);
+                    Line* pLines2 = &(listRB2Lines[j * 3]);
+
+                    GenerateHits(pRigidBody1, pRigidBody2, separatePlane, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2);
+                }
+            }
 
             return false;
         }
 
         void CollisionDetection() 
         {
+            ClearHits();
+
             for (int i = 0; i < m_listRigidBodies.size(); i++)
             {
                 struct RigidBody *pRigidBody1 = &(m_listRigidBodies[i]);
