@@ -26,7 +26,7 @@ namespace PhysicsCPU
             return ((std::fabs(fAngle) < 0.1f) || (std::fabs(fAngle) > 179.9f));
         }
 
-        static bool IntersectPlaneLine(struct RigidBody *pRigidBody, Plane* pPlane, Line* pLine, glm::vec3 *pRet)
+        static bool IntersectPlaneLine(Plane* pPlane, Line* pLine, glm::vec3 *pRet)
         {
             float denom = glm::dot(pPlane->m_v3Normal, pLine->GetDir());
 
@@ -97,6 +97,7 @@ namespace PhysicsCPU
 
             int32_t m_nConvexTriMeshId;
             int16_t m_nMaterialId;
+            int32_t m_nHitId;
         };
 
         struct Hit 
@@ -359,10 +360,12 @@ namespace PhysicsCPU
             rigidBody.m_matWorld = glm::identity<glm::mat4>();
             rigidBody.m_nConvexTriMeshId = -1;
             rigidBody.m_nMaterialId = -1;
-            m_listRigidBodies.push_back(rigidBody);
-
+            
+            rigidBody.m_nHitId = (int32_t)m_listHits.size();
             struct Hits hits;
             m_listHits.push_back(hits);
+
+            m_listRigidBodies.push_back(rigidBody);
 
             return nId;
         }
@@ -702,11 +705,11 @@ namespace PhysicsCPU
             }
         }
 
-        bool IsInside(glm::vec3 v3Point, std::vector<Plane>* pListPlanes) 
+        bool IsInside(glm::vec3 v3Point, Plane *pListPlanes) 
         {
-            for (int i = 0; i < (int)(*pListPlanes).size(); i++)
+            for (int i = 0; i < 4; i++)
             {
-                Plane plane = (*pListPlanes)[i];
+                Plane plane = pListPlanes[i];
                 if (plane.GetDistance(v3Point) > 0.001f) 
                 {
                     return false;
@@ -725,6 +728,49 @@ namespace PhysicsCPU
 
         void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, Plane separatePlane, Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
         {
+            struct Hits *pHits = &(m_listHits[pRigidBody1->m_nHitId]);
+
+            // RigidBody1 pontok benne vannak RigidBody2-ben?
+            for (int i = 0; i < 3; i++) 
+            {
+                glm::vec3 v3Point = pLines1[i].m_v3A;
+
+                if (true == IsInside(v3Point, pConvexPlanes2)) 
+                {
+                    struct Hit hit;
+                    hit.m_pRigidBody1 = pRigidBody1;
+                    hit.m_pRigidBody2 = pRigidBody2;
+                    hit.m_v3PointInWorld = v3Point;
+                    hit.m_fPenetration = std::fabs(separatePlane.GetDistance(v3Point));
+
+                    (*pHits).m_listHits.push_back(hit);
+                }
+            }
+            
+            // RigidBody1 edges-ei metszi RigidBody2 plane-eit?
+            for (int i = 0; i < 3; i++) 
+            {
+                Line *pLine = &(pLines1[i]);
+
+                for (int j = 0; j < 4; j++) 
+                {
+                    Plane *pPlane = &(pConvexPlanes2[j]);
+
+                    glm::vec3 v3Point;
+                    if (true == Physics::IntersectPlaneLine(pPlane, pLine, &v3Point) && true == IsInside(v3Point, pConvexPlanes2))
+                    {
+                        struct Hit hit;
+                        hit.m_pRigidBody1 = pRigidBody1;
+                        hit.m_pRigidBody2 = pRigidBody2;
+                        hit.m_v3PointInWorld = v3Point;
+                        hit.m_fPenetration = std::fabs(separatePlane.GetDistance(v3Point));
+
+                        (*pHits).m_listHits.push_back(hit);
+                    }
+
+                }
+            }
+
         }
 
         bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2) 
