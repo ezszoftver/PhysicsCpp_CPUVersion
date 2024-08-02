@@ -615,7 +615,10 @@ namespace PhysicsCPU
                 glm::vec3 v3LocalNormal = pTriangle->m_v3Normal;
                 glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
 
-                if (nullptr == pRet) { pRet = pTriangle; }
+                if (nullptr == pRet) 
+                { 
+                    pRet = pTriangle; 
+                }
                 else if (glm::angle(v3Dir, v3Normal) < glm::angle(v3Dir, pRet->m_v3Normal))
                 {
                     pRet = pTriangle;
@@ -819,7 +822,6 @@ namespace PhysicsCPU
             GeneratePlanesAndLines(pRigidBody1, &listRB1LocalTriangles, &listRB1Planes, &listRB1Lines);
             GeneratePlanesAndLines(pRigidBody2, &listRB2LocalTriangles, &listRB2Planes, &listRB2Lines);
             
-            //Physics::IntersectPlaneLine
             for (int i = 0; i < (int)listRB1LocalTriangles.size(); i++)
             {
                 Plane *pConvexPlanes1 = &(listRB1Planes[i * 4]);
@@ -837,7 +839,7 @@ namespace PhysicsCPU
                 }
             }
 
-            return false;
+            return true;
         }
 
         void CollisionDetection() 
