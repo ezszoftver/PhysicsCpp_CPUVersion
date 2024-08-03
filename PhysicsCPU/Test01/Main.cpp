@@ -9,6 +9,9 @@ GLFWwindow* pWindow;
 using namespace PhysicsCPU;
 Physics* pPhysics = NULL;
 
+#include "Camera.h"
+Camera m_Camera;
+
 float m_fElapsedTime = 0.0f;
 float m_fCurrentTime = 0.0f;
 int nFPS = 0;
@@ -109,17 +112,26 @@ bool Init()
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+	// physics
 	pPhysics = new Physics();
 	pPhysics->SetGravity(glm::vec3(0, -1.0f, 0));
 
 	CreateCube(glm::vec3(0, -1, 0), glm::vec3(3, 1, 3), 0.0f);
 	CreateCube(glm::vec3(0, 5, 0), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
+	// camera
+	m_Camera.Init(glm::vec3(5, 3, 0), glm::vec3(0, 0, 0));
+	// hide cursor
+	glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
+
 	return true;
 }
 
 void Exit() 
 {
+	// show cursor
+	glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
 	delete pPhysics;
 	pPhysics = NULL;
 }
@@ -163,6 +175,13 @@ void DebugDraw()
 
 void Update() 
 {
+	// esc exit
+	if (GLFW_PRESS == glfwGetKey(pWindow, GLFW_KEY_ESCAPE))
+	{
+		glfwSetWindowShouldClose(pWindow, true);
+		return;
+	}
+
 	// update
 	// delta time
 	m_fElapsedTime = m_fCurrentTime;
@@ -188,6 +207,35 @@ void Update()
 	// physics
 	pPhysics->Update(dt);
 
+	// camera
+	m_Camera.Update(dt);
+	if (GLFW_PRESS == glfwGetKey(pWindow, GLFW_KEY_W)) 
+	{
+		m_Camera.MoveW();
+	}
+	if (GLFW_PRESS == glfwGetKey(pWindow, GLFW_KEY_S))
+	{
+		m_Camera.MoveS();
+	}
+	if (GLFW_PRESS == glfwGetKey(pWindow, GLFW_KEY_A))
+	{
+		m_Camera.MoveA();
+	}
+	if (GLFW_PRESS == glfwGetKey(pWindow, GLFW_KEY_D))
+	{
+		m_Camera.MoveD();
+	}
+	double fMouseX, fMouseY;
+	glfwGetCursorPos(pWindow, &fMouseX, &fMouseY);
+	glfwSetCursorPos(pWindow, 320, 240);
+	double fDeltaMouseX = fMouseX - 320;
+	double fDeltaMouseY = fMouseY - 240;
+	m_Camera.Rotate(fDeltaMouseX, fDeltaMouseY);
+
+	glm::vec3 v3CameraPos = m_Camera.GetPos();
+	glm::vec3 v3CameraAt = m_Camera.GetAt();
+	glm::vec3 v3CameraDir = glm::normalize(v3CameraAt - v3CameraPos);
+
 	// draw
 	int nWidth, nHeight;
 	glfwGetFramebufferSize(pWindow, &nWidth, &nHeight);
@@ -197,9 +245,6 @@ void Update()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// camera
-	glm::vec3 v3CameraPos = glm::vec3(5, 3, 0);
-	glm::vec3 v3CameraAt = glm::vec3(0, 0, 0);
-	glm::vec3 v3CameraDir = glm::normalize(v3CameraAt - v3CameraPos);
 	glm::mat4 matCameraView = glm::lookAtRH(v3CameraPos, v3CameraAt, glm::vec3(0, 1, 0));
 	glm::mat4 matCameraProj = glm::perspectiveRH(glm::radians(45.0f), (float)nWidth / (float)nHeight, 0.01f, 1000.0f);
 
