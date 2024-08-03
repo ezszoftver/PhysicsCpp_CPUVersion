@@ -106,6 +106,7 @@ namespace PhysicsCPU
             RigidBody *m_pRigidBody2 = nullptr;
 
             glm::vec3 m_v3PointInWorld = glm::vec3(0, 0, 0);
+            glm::vec3 m_v3NormalInWorld = glm::vec3(0, 0, 0);
             float m_fPenetration = 0.0;
         };
 
@@ -744,6 +745,7 @@ namespace PhysicsCPU
                     hit.m_pRigidBody1 = pRigidBody1;
                     hit.m_pRigidBody2 = pRigidBody2;
                     hit.m_v3PointInWorld = v3Point;
+                    hit.m_v3NormalInWorld = separatePlane.m_v3Normal;
                     hit.m_fPenetration = std::fabs(separatePlane.GetDistance(v3Point));
 
                     (*pHits).m_listHits.push_back(hit);
@@ -766,6 +768,7 @@ namespace PhysicsCPU
                         hit.m_pRigidBody1 = pRigidBody1;
                         hit.m_pRigidBody2 = pRigidBody2;
                         hit.m_v3PointInWorld = v3Point;
+                        hit.m_v3NormalInWorld = separatePlane.m_v3Normal;
                         hit.m_fPenetration = std::fabs(separatePlane.GetDistance(v3Point));
 
                         (*pHits).m_listHits.push_back(hit);

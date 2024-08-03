@@ -173,10 +173,7 @@ void DebugDraw()
 	glPopMatrix();
 
 	// draw hits
-	//std::vector<struct Hits> m_listHits;
 	glPushMatrix();
-	glBegin(GL_POINTS);
-	glColor4f(0, 1.0f, 0, 1.0f);
 	for (int i = 0; i < pPhysics->NumRigidBodies(); i++) 
 	{
 		struct Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(i);
@@ -187,11 +184,29 @@ void DebugDraw()
 			struct Physics::Hit *pHit = &(pHits->m_listHits[j]);
 			glm::vec3 v3Point = pHit->m_v3PointInWorld;
 
-			glVertex3f(v3Point.x, v3Point.y, v3Point.z);
+			glBegin(GL_POINTS);
+			{
+				glColor4f(0, 1.0f, 0, 1.0f);
+				glVertex3f(v3Point.x, v3Point.y, v3Point.z);
+				glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+			}
+			glEnd();
+
+			glm::vec3 v3A = pHit->m_v3PointInWorld;
+			glm::vec3 v3B = v3A + (pHit->m_v3NormalInWorld * pHit->m_fPenetration);
+
+			glLineWidth(5.0);
+			glBegin(GL_LINES);
+			{
+				glColor4f(0, 1.0f, 0, 1.0f);
+				glVertex3f(v3A.x, v3A.y, v3A.z);
+				glVertex3f(v3B.x, v3B.y, v3B.z);
+				glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+			}
+			glEnd();
+			glLineWidth(1.0);
 		}
 	}
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-	glEnd();
 	glPopMatrix();
 }
 
