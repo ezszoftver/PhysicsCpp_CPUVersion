@@ -476,12 +476,12 @@ namespace PhysicsCPU
             }
         }
 
-        Plane SAT(RigidBody* pRigidBody1, RigidBody* pRigidBody2) 
+        glm::vec4 SAT(RigidBody* pRigidBody1, RigidBody* pRigidBody2) 
         {
             struct ConvexTriMesh* pConvexTriMesh1 = &(m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId]);
             struct ConvexTriMesh* pConvexTriMesh2 = &(m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId]);
 
-            Plane ret = Plane();
+            glm::vec4 ret(0, 0, 0, 0);
             float fMinPenetration = FLT_MAX;
 
             // 1/3 plane-point
@@ -507,14 +507,14 @@ namespace PhysicsCPU
 
                 if (fGlobalDistance > (fDist1 + fDist2)) 
                 {
-                    return Plane();
+                    return glm::vec4(0, 0, 0, 0);
                 }
 
                 float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
                 if (fPenetration < fMinPenetration)
                 {
                     fMinPenetration = fPenetration;
-                    ret = plane;
+                    ret = glm::vec4(plane.m_v3Normal, fMinPenetration);
                 }
 
             }
@@ -542,14 +542,14 @@ namespace PhysicsCPU
 
                 if (fGlobalDistance > (fDist1 + fDist2))
                 {
-                    return Plane();
+                    return glm::vec4(0, 0, 0, 0);
                 }
 
                 float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
                 if (fPenetration < fMinPenetration)
                 {
                     fMinPenetration = fPenetration;
-                    ret = plane;
+                    ret = glm::vec4(plane.m_v3Normal, fMinPenetration);
                 }
 
             }
@@ -589,18 +589,17 @@ namespace PhysicsCPU
 
                     if (fGlobalDistance > (fDist1 + fDist2))
                     {
-                        return Plane();
+                        return glm::vec4(0, 0, 0, 0);
                     }
 
                     float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
                     if (fPenetration < fMinPenetration)
                     {
                         fMinPenetration = fPenetration;
-                        ret = plane;
+                        ret = glm::vec4(plane.m_v3Normal, fMinPenetration);
                     }
                 }
             }
-
 
             return ret;
         }
@@ -731,7 +730,7 @@ namespace PhysicsCPU
             }
         }
 
-        void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, glm::vec3 v3Normal, Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
+        void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, glm::vec3 v3Normal, float fPenetration,  Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
         {
             struct Hits *pHits = &(m_listHits[pRigidBody1->m_nHitId]);
 
@@ -747,7 +746,7 @@ namespace PhysicsCPU
                     hit.m_pRigidBody2 = pRigidBody2;
                     hit.m_v3PointInWorld = v3Point;
                     hit.m_v3NormalInWorld = v3Normal;
-                    hit.m_fPenetration = std::fabs(pConvexPlanes2[0].GetDistance(v3Point));
+                    hit.m_fPenetration = std::fabs(fPenetration);
 
                     (*pHits).m_listHits.push_back(hit);
                 }
@@ -770,7 +769,7 @@ namespace PhysicsCPU
                         hit.m_pRigidBody2 = pRigidBody2;
                         hit.m_v3PointInWorld = v3Point;
                         hit.m_v3NormalInWorld = v3Normal;
-                        hit.m_fPenetration = std::fabs(pConvexPlanes2[0].GetDistance(v3Point));
+                        hit.m_fPenetration = std::fabs(fPenetration);
 
                         (*pHits).m_listHits.push_back(hit);
                     }
@@ -782,9 +781,11 @@ namespace PhysicsCPU
 
         bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2) 
         {
-            Plane separatePlane = SAT(pRigidBody1, pRigidBody2);
+            glm::vec4 separate = SAT(pRigidBody1, pRigidBody2);
+            glm::vec3 v3SeparateNormal = glm::vec3(separate.x, separate.y, separate.z);
+            float fPenetration = separate.w;
 
-            if (glm::length(separatePlane.m_v3Normal) < 0.001f)
+            if (glm::length(v3SeparateNormal) < 0.001f)
             {
                 //printf("Coll false\n");
                 return false;
@@ -798,15 +799,15 @@ namespace PhysicsCPU
             glm::vec3 v3RB1Dir;
             {
                 glm::vec3 v3ToRB2 = glm::normalize(pRigidBody2->m_v3Position - pRigidBody1->m_v3Position);
-                if (glm::angle(separatePlane.m_v3Normal, v3ToRB2) < glm::radians(90.0f)) { v3RB1Dir = separatePlane.m_v3Normal; }
-                else { v3RB1Dir = -separatePlane.m_v3Normal; }
+                if (glm::angle(v3SeparateNormal, v3ToRB2) < glm::radians(90.0f)) { v3RB1Dir = v3SeparateNormal; }
+                else { v3RB1Dir = -v3SeparateNormal; }
             }
 
             glm::vec3 v3RB2Dir;
             {
                 glm::vec3 v3ToRB1 = glm::normalize(pRigidBody1->m_v3Position - pRigidBody2->m_v3Position);
-                if (glm::angle(separatePlane.m_v3Normal, v3ToRB1) < glm::radians(90.0f)) { v3RB2Dir = separatePlane.m_v3Normal; }
-                else { v3RB2Dir = -separatePlane.m_v3Normal; }
+                if (glm::angle(v3SeparateNormal, v3ToRB1) < glm::radians(90.0f)) { v3RB2Dir = v3SeparateNormal; }
+                else { v3RB2Dir = -v3SeparateNormal; }
             }
 
             Triangle *pRB1BestTriangle = FindBestTriangle(pRigidBody1, v3RB1Dir);
@@ -836,8 +837,8 @@ namespace PhysicsCPU
                     Plane* pConvexPlanes2 = &(listRB2Planes[j * 4]);
                     Line* pLines2 = &(listRB2Lines[j * 3]);
 
-                    GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2);
-                    GenerateHits(pRigidBody2, pRigidBody1, v3RB2Dir, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1);
+                    GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, fPenetration, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2);
+                    GenerateHits(pRigidBody2, pRigidBody1, v3RB2Dir, fPenetration, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1);
                 }
             }
 
