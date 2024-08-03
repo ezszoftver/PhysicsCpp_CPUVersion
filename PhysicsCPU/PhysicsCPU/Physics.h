@@ -36,7 +36,7 @@ namespace PhysicsCPU
 
                 if (t < 0.0f) { return false; }
                 glm::vec3 v3IntersectPoint = pLine->m_v3A + (t * pLine->GetDir());
-                float t_max = glm::distance(pLine->m_v3A, v3IntersectPoint);
+                float t_max = glm::distance(pLine->m_v3A, pLine->m_v3B);
                 if (t > t_max) { return false; }
 
                 (*pRet) = v3IntersectPoint;

@@ -111,13 +111,16 @@ bool Init()
 	glEnable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPointSize(10.0f);
+	glEnable(GL_POINT_SMOOTH);
+	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
 	// physics
 	pPhysics = new Physics();
-	pPhysics->SetGravity(glm::vec3(0, -1.0f, 0));
+	pPhysics->SetGravity(glm::vec3(0, -0.0f, 0));
 
 	CreateCube(glm::vec3(0, -1, 0), glm::vec3(3, 1, 3), 0.0f);
-	CreateCube(glm::vec3(0, 5, 0), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
+	CreateCube(glm::vec3(0, 0.4f, 0), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	// camera
 	m_Camera.Init(glm::vec3(5, 3, 0), glm::vec3(0, 0, 0));
@@ -138,11 +141,10 @@ void Exit()
 
 void DebugDraw()
 {
+	// draw triangles
 	glPushMatrix();
 	glBegin(GL_TRIANGLES);
-
 	glColor4f(1.0f, 0, 0, 1.0f);
-
 	for (int i = 0; i < pPhysics->NumRigidBodies(); i++)
 	{
 		struct Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(i);
@@ -166,9 +168,29 @@ void DebugDraw()
 		}
 
 	}
-
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	glEnd();
+	glPopMatrix();
 
+	// draw hits
+	//std::vector<struct Hits> m_listHits;
+	glPushMatrix();
+	glBegin(GL_POINTS);
+	glColor4f(0, 1.0f, 0, 1.0f);
+	for (int i = 0; i < pPhysics->NumRigidBodies(); i++) 
+	{
+		struct Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(i);
+		struct Physics::Hits *pHits = &(pPhysics->m_listHits[pRigidBody->m_nHitId]);
+
+		for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
+		{
+			struct Physics::Hit *pHit = &(pHits->m_listHits[j]);
+			glm::vec3 v3Point = pHit->m_v3PointInWorld;
+
+			glVertex3f(v3Point.x, v3Point.y, v3Point.z);
+		}
+	}
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnd();
 	glPopMatrix();
 }
