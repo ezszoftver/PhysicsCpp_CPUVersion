@@ -601,6 +601,7 @@ namespace PhysicsCPU
                 }
             }
 
+
             return ret;
         }
 
@@ -730,7 +731,7 @@ namespace PhysicsCPU
             }
         }
 
-        void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, Plane separatePlane, Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
+        void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, glm::vec3 v3Normal, Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
         {
             struct Hits *pHits = &(m_listHits[pRigidBody1->m_nHitId]);
 
@@ -745,8 +746,8 @@ namespace PhysicsCPU
                     hit.m_pRigidBody1 = pRigidBody1;
                     hit.m_pRigidBody2 = pRigidBody2;
                     hit.m_v3PointInWorld = v3Point;
-                    hit.m_v3NormalInWorld = separatePlane.m_v3Normal;
-                    hit.m_fPenetration = std::fabs(separatePlane.GetDistance(v3Point));
+                    hit.m_v3NormalInWorld = v3Normal;
+                    hit.m_fPenetration = std::fabs(pConvexPlanes2[0].GetDistance(v3Point));
 
                     (*pHits).m_listHits.push_back(hit);
                 }
@@ -768,8 +769,8 @@ namespace PhysicsCPU
                         hit.m_pRigidBody1 = pRigidBody1;
                         hit.m_pRigidBody2 = pRigidBody2;
                         hit.m_v3PointInWorld = v3Point;
-                        hit.m_v3NormalInWorld = separatePlane.m_v3Normal;
-                        hit.m_fPenetration = std::fabs(separatePlane.GetDistance(v3Point));
+                        hit.m_v3NormalInWorld = v3Normal;
+                        hit.m_fPenetration = std::fabs(pConvexPlanes2[0].GetDistance(v3Point));
 
                         (*pHits).m_listHits.push_back(hit);
                     }
@@ -835,10 +836,8 @@ namespace PhysicsCPU
                     Plane* pConvexPlanes2 = &(listRB2Planes[j * 4]);
                     Line* pLines2 = &(listRB2Lines[j * 3]);
 
-                    GenerateHits(pRigidBody1, pRigidBody2, separatePlane, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2);
-
-                    Plane negativeSeparatePlane = Plane(separatePlane.m_v3Pos, -separatePlane.m_v3Normal);
-                    GenerateHits(pRigidBody2, pRigidBody1, negativeSeparatePlane, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1);
+                    GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2);
+                    GenerateHits(pRigidBody2, pRigidBody1, v3RB2Dir, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1);
                 }
             }
 
