@@ -265,8 +265,8 @@ void Update()
 	double fMouseX, fMouseY;
 	glfwGetCursorPos(pWindow, &fMouseX, &fMouseY);
 	glfwSetCursorPos(pWindow, 320, 240);
-	double fDeltaMouseX = fMouseX - 320;
-	double fDeltaMouseY = fMouseY - 240;
+	int fDeltaMouseX = (int)fMouseX - 320;
+	int fDeltaMouseY = (int)fMouseY - 240;
 	m_Camera.Rotate(fDeltaMouseX, fDeltaMouseY);
 
 	glm::vec3 v3CameraPos = m_Camera.GetPos();
