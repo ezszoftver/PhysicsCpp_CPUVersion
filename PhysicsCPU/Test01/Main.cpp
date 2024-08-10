@@ -305,8 +305,8 @@ int main(int argc, char **argv)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-	int nWindowWidth = 800;
-	int nWindowHeight = 600;
+	int nWindowWidth = 1280;
+	int nWindowHeight = 720;
 	pWindow = glfwCreateWindow(nWindowWidth, nWindowHeight, "PhysicsCPU - Test01", NULL, NULL);
 	glfwMakeContextCurrent(pWindow);
 	glfwSwapInterval(0);

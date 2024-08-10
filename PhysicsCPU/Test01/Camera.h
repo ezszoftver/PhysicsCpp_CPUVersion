@@ -93,8 +93,8 @@ private:
 	glm::vec3 dir;
 	glm::vec3 up;
 
-	float fMoveSpeed = 5.0f;
-	float fRotateSpeed = 0.003f;
+	float fMoveSpeed = 1.0f;
+	float fRotateSpeed = 0.001f;
 
 	float dt;
 };
