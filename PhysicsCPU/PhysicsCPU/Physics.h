@@ -87,8 +87,7 @@ namespace PhysicsCPU
             glm::vec3 m_v3Torque;
             glm::vec3 m_v3AngularAcceleration;
             glm::vec3 m_v3AngularVelocity;
-            glm::vec3 m_v3Axis;
-            float m_fAngle;
+            glm::quat m_quatOrientation;
 
             float m_fLinearDamping;
             float m_fAngularDamping;
@@ -370,8 +369,7 @@ namespace PhysicsCPU
             rigidBody.m_v3Torque = glm::vec3(0.0f, 0.0f, 0.0f);
             rigidBody.m_v3AngularAcceleration = glm::vec3(0.0f, 0.0f, 0.0f);
             rigidBody.m_v3AngularVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
-            rigidBody.m_v3Axis = glm::vec3(1, 0, 0);
-            rigidBody.m_fAngle = 0.0f;
+            rigidBody.m_quatOrientation = glm::identity<glm::quat>();
             rigidBody.m_fLinearDamping = 0.0f;
             rigidBody.m_fAngularDamping = 0.0f;
             rigidBody.m_matWorld = glm::identity<glm::mat4>();
@@ -405,6 +403,19 @@ namespace PhysicsCPU
             UpdateTransforms();
         }
 
+        glm::quat ApplyAngularVelocity(glm::quat orientation, glm::vec3 angularVelocity, float deltaTime) 
+        {
+            // Kiszámítjuk a forgási tengelyt és szöget
+            glm::vec3 axis = glm::normalize(angularVelocity); // A forgás tengelye
+            float angle = glm::length(angularVelocity) * deltaTime; // A forgás szöge (rad)
+
+            // Létrehozzuk a kvaterniót a szögsebesség alapján
+            glm::quat rotation = glm::angleAxis(angle, axis);
+
+            // Alkalmazzuk a forgatást az eredeti kvaternióra
+            return glm::normalize(rotation * orientation); // A forgást balról kell megszorozni
+        }
+
         void Integrate()
         {
             float dt = m_common.m_fFixedDeltaTime / (float)m_common.m_nNumSubIntegrates;
@@ -436,14 +447,10 @@ namespace PhysicsCPU
                     //rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, dt);
 
                     // axis, angle
-                    float fDeltaAngle = glm::length(rigidBody.m_v3AngularVelocity) * dt;
-                    glm::vec3 v3RotationAxis = glm::vec3(1, 0, 0);
                     if (glm::length(rigidBody.m_v3AngularVelocity) > 0.0001f) 
                     {
-                        v3RotationAxis = glm::normalize(rigidBody.m_v3AngularVelocity);
+                        rigidBody.m_quatOrientation = ApplyAngularVelocity(rigidBody.m_quatOrientation, rigidBody.m_v3AngularVelocity, dt);
                     }
-                    rigidBody.m_v3Axis = glm::normalize(glm::rotate(rigidBody.m_v3Axis, fDeltaAngle, v3RotationAxis));
-                    rigidBody.m_fAngle += fDeltaAngle;
                 }
                 
             }//);
@@ -456,8 +463,7 @@ namespace PhysicsCPU
             {
                 struct RigidBody& rigidBody = m_listRigidBodies[id];
 
-                glm::quat quat = glm::angleAxis(rigidBody.m_fAngle, rigidBody.m_v3Axis);
-                glm::mat4 matRotate = glm::toMat4(quat);
+                glm::mat4 matRotate = glm::toMat4(rigidBody.m_quatOrientation);
                 glm::mat4 matTranslate = glm::translate(rigidBody.m_v3Position);
 
                 rigidBody.m_matWorld = matTranslate * matRotate;

@@ -17,7 +17,7 @@ float m_fCurrentTime = 0.0f;
 int nFPS = 0;
 float fSec = 0.0f;
 
-void CreateCube(glm::vec3 v3Position, glm::vec3 v3HalfSize, float fMass) 
+void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3HalfSize, float fMass)
 {
 	int matId = pPhysics->GenMaterial();
 	Physics::Material* pMaterial = pPhysics->GetMaterial(matId);
@@ -100,8 +100,7 @@ void CreateCube(glm::vec3 v3Position, glm::vec3 v3HalfSize, float fMass)
 	Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(bodyId);
 	pRigidBody->m_fMass = fMass;
 	pRigidBody->m_v3Position = v3Position;
-	pRigidBody->m_v3Axis = glm::vec3(1, 0, 0);
-	pRigidBody->m_fAngle = 0.0f;
+	pRigidBody->m_quatOrientation = quatOrientation;
 	pRigidBody->m_nConvexTriMeshId = meshId;
 	pRigidBody->m_nMaterialId = matId;
 }
@@ -119,11 +118,11 @@ bool Init()
 	pPhysics = new Physics();
 	pPhysics->SetGravity(glm::vec3(0, -0.1f, 0));
 
-	CreateCube(glm::vec3(0, -1, 0), glm::vec3(3, 1, 3), 0.0f);
-	CreateCube(glm::vec3(0, 1.0f, 0), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
+	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(3, 1, 3), 0.0f);
+	CreateCube(glm::vec3(0, 1.5f, 0), glm::quat(glm::radians(glm::vec3(15.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	// camera
-	m_Camera.Init(glm::vec3(5, 3, 0), glm::vec3(0, 0, 0));
+	m_Camera.Init(glm::vec3(5, 1, 0), glm::vec3(0, 0, 0));
 	// hide cursor
 	glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
