@@ -116,13 +116,13 @@ bool Init()
 
 	// physics
 	pPhysics = new Physics();
-	pPhysics->SetGravity(glm::vec3(0, -0.1f, 0));
+	pPhysics->SetGravity(glm::vec3(0.0f, -2.0f, 0.0f));
 
-	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(3, 1, 3), 0.0f);
+	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(-15.0f, 0.0f, 0.0f))), glm::vec3(3, 0.1, 3), 0.0f);
 	CreateCube(glm::vec3(0, 1.5f, 0), glm::quat(glm::radians(glm::vec3(15.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	// camera
-	m_Camera.Init(glm::vec3(5, 1, 0), glm::vec3(0, 0, 0));
+	m_Camera.Init(glm::vec3(10, 1, 0), glm::vec3(0, 0, 0));
 	// hide cursor
 	glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
