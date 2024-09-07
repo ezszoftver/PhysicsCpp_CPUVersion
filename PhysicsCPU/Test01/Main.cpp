@@ -193,7 +193,7 @@ void DebugDraw()
 			glEnd();
 
 			glm::vec3 v3A = pHit->m_v3PointInWorld;
-			glm::vec3 v3B = v3A + (-pHit->m_v3NormalInWorld * pHit->m_fPenetration);
+			glm::vec3 v3B = v3A + (pHit->m_v3NormalInWorld * pHit->m_fPenetration);
 
 			glLineWidth(5.0);
 			glBegin(GL_LINES);

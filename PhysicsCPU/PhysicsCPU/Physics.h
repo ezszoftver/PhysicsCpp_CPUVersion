@@ -730,6 +730,19 @@ namespace PhysicsCPU
             }
         }
 
+        bool IsContains(struct Hits *pHits, struct Hit hit)
+        {
+            for (int i = 0; i < (int)(*pHits).m_listHits.size(); i++)
+            {
+                if ((*pHits).m_listHits[i].m_v3PointInWorld == hit.m_v3PointInWorld) 
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, glm::vec3 v3Normal, float fPenetration,  Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2)
         {
             struct Hits *pHits = &(m_listHits[pRigidBody1->m_nHitId]);
@@ -748,7 +761,10 @@ namespace PhysicsCPU
                     hit.m_v3NormalInWorld = v3Normal;
                     hit.m_fPenetration = std::fabs(fPenetration);
 
-                    (*pHits).m_listHits.push_back(hit);
+                    if (false == IsContains(pHits, hit)) 
+                    {
+                        (*pHits).m_listHits.push_back(hit);
+                    }
                 }
             }
             
@@ -771,7 +787,10 @@ namespace PhysicsCPU
                         hit.m_v3NormalInWorld = v3Normal;
                         hit.m_fPenetration = std::fabs(fPenetration);
 
-                        (*pHits).m_listHits.push_back(hit);
+                        if (false == IsContains(pHits, hit)) 
+                        {
+                            (*pHits).m_listHits.push_back(hit);
+                        }
                     }
 
                 }
