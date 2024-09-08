@@ -941,6 +941,8 @@ namespace PhysicsCPU
                 float term4 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rB, pHit->m_v3NormalInWorld), rB));
                 float J = nominator / (term1 + term2 + term3 + term4);
 
+                J /= (float)pHits->m_listHits.size();
+
                 // apply velocity
                 if (fInvMass1 > 0.0f)
                 {
@@ -956,7 +958,7 @@ namespace PhysicsCPU
             }
 
             // tangent
-            /*for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
+            for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
             {
                 Hit* pHit = &(pHits->m_listHits[j]);
 
@@ -975,6 +977,15 @@ namespace PhysicsCPU
                 }
 
                 glm::vec3 v3Tangent = v3RelVelocity - (glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld) * pHit->m_v3NormalInWorld);
+                if (glm::length(v3Tangent) > 0.001f)
+                {
+                    v3Tangent = glm::normalize(v3Tangent);
+                }
+                else
+                {
+                    //v3Tangent = glm::vec3(0, 0, 0);
+                    continue;
+                }
 
                 float fInvMass1 = 0.0f;
                 if (pHit->m_pRigidBody1->m_fMass > 0.0f) { fInvMass1 = 1.0f / pHit->m_pRigidBody1->m_fMass; }
@@ -989,6 +1000,8 @@ namespace PhysicsCPU
                 float term4 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rB, v3Tangent), rB));
                 float J = nominator / (term1 + term2 + term3 + term4);
 
+                J /= (float)pHits->m_listHits.size();
+
                 // apply velocity
                 if (fInvMass1 > 0.0f)
                 {
@@ -1001,7 +1014,7 @@ namespace PhysicsCPU
                     pHit->m_pRigidBody2->m_v3LinearVelocity -= (J)*v3Tangent;
                     pHit->m_pRigidBody2->m_v3AngularVelocity -= (J)*glm::cross(rB, v3Tangent);
                 }
-            }*/
+            }
 
             // separate
             glm::vec3 v3NormalInWorld = glm::vec3(0, 0, 0);
@@ -1020,8 +1033,8 @@ namespace PhysicsCPU
 
             glm::vec3 v3Translate = v3NormalInWorld * fMaxPenetration;
             Hit* pHit = &(pHits->m_listHits[0]);
-            float fMass1 = pHit->m_pRigidBody1->m_fMass; if (fMass1 <= 0.0f) { fMass1 = FLT_MAX; }
-            float fMass2 = pHit->m_pRigidBody2->m_fMass; if (fMass2 <= 0.0f) { fMass2 = FLT_MAX; }
+            float fMass1 = pHit->m_pRigidBody1->m_fMass; if (fMass1 <= 0.0f) { fMass1 = 1000000.0f; }
+            float fMass2 = pHit->m_pRigidBody2->m_fMass; if (fMass2 <= 0.0f) { fMass2 = 1000000.0f; }
 
             if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
             {
