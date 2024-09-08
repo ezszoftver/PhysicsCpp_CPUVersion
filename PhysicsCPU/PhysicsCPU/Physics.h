@@ -925,7 +925,7 @@ namespace PhysicsCPU
 
                 if (fProjVelocity <= 0.0f)
                 {
-                    //continue;
+                    continue;
                 }
 
                 float fInvMass1 = 0.0f;
@@ -956,7 +956,7 @@ namespace PhysicsCPU
             }
 
             // tangent
-            for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
+            /*for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
             {
                 Hit* pHit = &(pHits->m_listHits[j]);
 
@@ -971,7 +971,7 @@ namespace PhysicsCPU
 
                 if (fProjVelocity <= 0.0f)
                 {
-                    //continue;
+                    continue;
                 }
 
                 glm::vec3 v3Tangent = v3RelVelocity - (glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld) * pHit->m_v3NormalInWorld);
@@ -1001,8 +1001,8 @@ namespace PhysicsCPU
                     pHit->m_pRigidBody2->m_v3LinearVelocity -= (J)*v3Tangent;
                     pHit->m_pRigidBody2->m_v3AngularVelocity -= (J)*glm::cross(rB, v3Tangent);
                 }
-            }
-            
+            }*/
+
             // separate
             glm::vec3 v3NormalInWorld = glm::vec3(0, 0, 0);
             float fMaxPenetration = 0.0f;
