@@ -405,6 +405,11 @@ namespace PhysicsCPU
 
         glm::quat ApplyAngularVelocity(glm::quat orientation, glm::vec3 angularVelocity, float deltaTime) 
         {
+            if (glm::length(angularVelocity) < 0.0001f) 
+            {
+                return orientation;
+            }
+
             // Kiszámítjuk a forgási tengelyt és szöget
             glm::vec3 axis = glm::normalize(angularVelocity); // A forgás tengelye
             float angle = glm::length(angularVelocity) * deltaTime; // A forgás szöge (rad)
@@ -414,6 +419,18 @@ namespace PhysicsCPU
 
             // Alkalmazzuk a forgatást az eredeti kvaternióra
             return glm::normalize(rotation * orientation); // A forgást balról kell megszorozni
+        }
+
+        glm::vec3 ApplyLinearDamping(glm::vec3 velocity, float dampingFactor, float deltaTime) 
+        {
+            velocity *= (1.0f - dampingFactor * deltaTime);
+            return velocity;
+        }
+
+        glm::vec3 ApplyAngularDamping(glm::vec3 angularVelocity, float dampingFactor, float deltaTime) 
+        {
+            angularVelocity *= (1.0f - dampingFactor * deltaTime);
+            return angularVelocity;
         }
 
         void Integrate()
@@ -436,21 +453,18 @@ namespace PhysicsCPU
                     // translate
                     rigidBody.m_v3LinearAcceleration = m_common.m_v3Gravity + (rigidBody.m_v3Force / rigidBody.m_fMass);
                     rigidBody.m_v3LinearVelocity += rigidBody.m_v3LinearAcceleration * dt;
-                    rigidBody.m_v3Position += rigidBody.m_v3LinearVelocity * dt;
 
                     // rotate
                     rigidBody.m_v3AngularAcceleration = (rigidBody.m_v3Torque / rigidBody.m_fMass);
                     rigidBody.m_v3AngularVelocity += rigidBody.m_v3AngularAcceleration * dt;
                     
                     // damping
-                    //rigidBody.m_v3LinearVelocity *= std::powf(rigidBody.m_fLinearDamping, dt);
-                    //rigidBody.m_v3AngularVelocity *= std::powf(rigidBody.m_fAngularDamping, dt);
+                    rigidBody.m_v3LinearVelocity = ApplyLinearDamping(rigidBody.m_v3LinearVelocity, rigidBody.m_fLinearDamping, dt);
+                    rigidBody.m_v3AngularVelocity = ApplyAngularDamping(rigidBody.m_v3AngularVelocity, rigidBody.m_fAngularDamping, dt);
 
-                    // axis, angle
-                    if (glm::length(rigidBody.m_v3AngularVelocity) > 0.0001f) 
-                    {
-                        rigidBody.m_quatOrientation = ApplyAngularVelocity(rigidBody.m_quatOrientation, rigidBody.m_v3AngularVelocity, dt);
-                    }
+                    // apply
+                    rigidBody.m_v3Position += rigidBody.m_v3LinearVelocity * dt;
+                    rigidBody.m_quatOrientation = ApplyAngularVelocity(rigidBody.m_quatOrientation, rigidBody.m_v3AngularVelocity, dt);
                 }
                 
             }//);
@@ -925,7 +939,7 @@ namespace PhysicsCPU
 
                 if (fProjVelocity <= 0.0f)
                 {
-                    continue;
+                    //continue;
                 }
 
                 float fInvMass1 = 0.0f;
@@ -973,7 +987,7 @@ namespace PhysicsCPU
 
                 if (fProjVelocity <= 0.0f)
                 {
-                    continue;
+                    //continue;
                 }
 
                 glm::vec3 v3Tangent = v3RelVelocity - (glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld) * pHit->m_v3NormalInWorld);
@@ -1030,7 +1044,7 @@ namespace PhysicsCPU
             if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
             {
                 float fWeight = fMass2 / (fMass1 + fMass2);
-                pHit->m_pRigidBody1->m_v3Position += v3Translate * fWeight;
+                pHit->m_pRigidBody1->m_v3Position -= v3Translate * fWeight;
             }
 
             if (pHit->m_pRigidBody2->m_fMass > 0.0f)
