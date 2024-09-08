@@ -405,7 +405,7 @@ namespace PhysicsCPU
 
         glm::quat ApplyAngularVelocity(glm::quat orientation, glm::vec3 angularVelocity, float deltaTime) 
         {
-            if (glm::length(angularVelocity) < 0.0001f) 
+            if (glm::length(angularVelocity) < 0.001f) 
             {
                 return orientation;
             }
@@ -939,7 +939,7 @@ namespace PhysicsCPU
 
                 if (fProjVelocity <= 0.0f)
                 {
-                    //continue;
+                    continue;
                 }
 
                 float fInvMass1 = 0.0f;
@@ -955,7 +955,7 @@ namespace PhysicsCPU
                 float term4 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rB, pHit->m_v3NormalInWorld), rB));
                 float J = nominator / (term1 + term2 + term3 + term4);
 
-                J /= (float)pHits->m_listHits.size();
+                //J /= (float)pHits->m_listHits.size();
 
                 // apply velocity
                 if (fInvMass1 > 0.0f)
@@ -987,7 +987,7 @@ namespace PhysicsCPU
 
                 if (fProjVelocity <= 0.0f)
                 {
-                    //continue;
+                    continue;
                 }
 
                 glm::vec3 v3Tangent = v3RelVelocity - (glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld) * pHit->m_v3NormalInWorld);
@@ -1005,7 +1005,7 @@ namespace PhysicsCPU
                 float term4 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rB, v3Tangent), rB));
                 float J = nominator / (term1 + term2 + term3 + term4);
 
-                J /= (float)pHits->m_listHits.size();
+                //J /= (float)pHits->m_listHits.size();
 
                 // apply velocity
                 if (fInvMass1 > 0.0f)
@@ -1038,19 +1038,23 @@ namespace PhysicsCPU
 
             glm::vec3 v3Translate = v3NormalInWorld * fMaxPenetration;
             Hit* pHit = &(pHits->m_listHits[0]);
-            float fMass1 = pHit->m_pRigidBody1->m_fMass; if (fMass1 <= 0.0f) { fMass1 = 1000000.0f; }
-            float fMass2 = pHit->m_pRigidBody2->m_fMass; if (fMass2 <= 0.0f) { fMass2 = 1000000.0f; }
+            float fMass1 = pHit->m_pRigidBody1->m_fMass; if (fMass1 <= 0.0f) { fMass1 = FLT_MAX; }
+            float fMass2 = pHit->m_pRigidBody2->m_fMass; if (fMass2 <= 0.0f) { fMass2 = FLT_MAX; }
 
             if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
             {
-                float fWeight = fMass2 / (fMass1 + fMass2);
-                pHit->m_pRigidBody1->m_v3Position -= v3Translate * fWeight;
+                float fWeight12 = std::fmax(0.0f, glm::dot(glm::normalize(-v3Translate), glm::normalize(-m_common.m_v3Gravity)));
+                float fWeight1 = fMass2 / (fMass1 + fMass2);
+                pHit->m_pRigidBody1->m_v3Position -= v3Translate * fWeight1 * fWeight12;
+                //pHit->m_pRigidBody1->m_v3LinearVelocity *= 0.9f * m_common.m_fFixedDeltaTime;
             }
 
-            if (pHit->m_pRigidBody2->m_fMass > 0.0f)
+            if (pHit->m_pRigidBody2->m_fMass > 0.0f) 
             {
-                float fWeight = fMass1 / (fMass1 + fMass2);
-                pHit->m_pRigidBody2->m_v3Position += v3Translate * fWeight;
+                float fWeight22 = std::fmax(0.0f, glm::dot(glm::normalize(v3Translate), glm::normalize(-m_common.m_v3Gravity)));
+                float fWeight2 = fMass1 / (fMass1 + fMass2);
+                pHit->m_pRigidBody2->m_v3Position += v3Translate * fWeight2 * fWeight22;
+                //pHit->m_pRigidBody2->m_v3LinearVelocity *= 0.9f * m_common.m_fFixedDeltaTime;
             }
 
         }

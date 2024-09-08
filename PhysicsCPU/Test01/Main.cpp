@@ -104,8 +104,8 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	pRigidBody->m_nConvexTriMeshId = meshId;
 	pRigidBody->m_nMaterialId = matId;
 
-	pRigidBody->m_fLinearDamping = 0.9f;
-	pRigidBody->m_fAngularDamping = 0.9f;
+	pRigidBody->m_fLinearDamping = 0.5f;
+	pRigidBody->m_fAngularDamping = 0.5f;
 }
 
 bool Init() 
@@ -119,16 +119,19 @@ bool Init()
 
 	// physics
 	pPhysics = new Physics();
-	pPhysics->SetGravity(glm::vec3(0.0f, -2.0f, 0.0f));
+	pPhysics->SetGravity(glm::vec3(0.0f, -1.0f, 0.0f));
 
-	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(-30.0f, 0.0f, 0.0f))), glm::vec3(3, 0.1, 3), 0.0f);
+	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(-20.0f, 0.0f, 0.0f))), glm::vec3(3, 0.1, 3), 0.0f);
 
-	CreateCube(glm::vec3(0, 0.75f, 0), glm::quat(glm::radians(glm::vec3(15.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
+	for (int i = 0; i < 5; i++) 
+	{
+		CreateCube(glm::vec3(0, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
+	}
 
-	CreateCube(glm::vec3(0, 2.0f, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
+	//CreateCube(glm::vec3(0, 2.0f, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	// camera
-	m_Camera.Init(glm::vec3(10, 1, 0), glm::vec3(0, 0, 0));
+	m_Camera.Init(glm::vec3(15, 1, 0), glm::vec3(0, 0, 0));
 	// hide cursor
 	glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
