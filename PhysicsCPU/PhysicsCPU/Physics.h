@@ -977,15 +977,6 @@ namespace PhysicsCPU
                 }
 
                 glm::vec3 v3Tangent = v3RelVelocity - (glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld) * pHit->m_v3NormalInWorld);
-                if (glm::length(v3Tangent) > 0.001f)
-                {
-                    v3Tangent = glm::normalize(v3Tangent);
-                }
-                else
-                {
-                    //v3Tangent = glm::vec3(0, 0, 0);
-                    continue;
-                }
 
                 float fInvMass1 = 0.0f;
                 if (pHit->m_pRigidBody1->m_fMass > 0.0f) { fInvMass1 = 1.0f / pHit->m_pRigidBody1->m_fMass; }
