@@ -22,7 +22,7 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	int matId = pPhysics->GenMaterial();
 	Physics::Material* pMaterial = pPhysics->GetMaterial(matId);
 	pMaterial->m_fRestitution = 0.0f;
-	pMaterial->m_fFriction = 0.0f;
+	pMaterial->m_fFriction = 0.5f;
 
 	int meshId = pPhysics->GenConvexTriMesh();
 	Physics::ConvexTriMesh* pMesh = pPhysics->GetConvexTriMesh(meshId);
@@ -104,8 +104,13 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	pRigidBody->m_nConvexTriMeshId = meshId;
 	pRigidBody->m_nMaterialId = matId;
 
-	pRigidBody->m_fLinearDamping = 0.5f;
-	pRigidBody->m_fAngularDamping = 0.5f;
+	pRigidBody->m_fLinearDamping = 0.1f;
+	pRigidBody->m_fAngularDamping = 0.1f;
+
+	if (fMass > 0.0f) 
+	{
+		//CalculateInertia(pRigidBody, fMass, v3HalfSize.x * 2.0f, v3HalfSize.y * 2.0f, v3HalfSize.z * 2.0f);
+	}
 }
 
 bool Init() 
@@ -118,8 +123,8 @@ bool Init()
 	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
 	// physics
-	pPhysics = new Physics();
-	pPhysics->SetGravity(glm::vec3(0.0f, -1.0f, 0.0f));
+	pPhysics = new Physics(200);
+	pPhysics->SetGravity(glm::vec3(0.0f, -5.0f, 0.0f));
 
 	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(-20.0f, 0.0f, 0.0f))), glm::vec3(3, 0.1, 3), 0.0f);
 

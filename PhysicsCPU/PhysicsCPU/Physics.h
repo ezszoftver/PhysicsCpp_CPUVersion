@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <stdio.h>
 #include <vector>
@@ -78,6 +78,10 @@ namespace PhysicsCPU
         struct RigidBody
         {
             float m_fMass;
+            
+            float m_fInertiaX;  // Tehetetlenségi nyomaték x tengely körül
+            float m_fInertiaY;  // Tehetetlenségi nyomaték y tengely körül
+            float m_fInertiaZ;  // Tehetetlenségi nyomaték z tengely körül
 
             glm::vec3 m_v3Force;
             glm::vec3 m_v3LinearAcceleration;
@@ -282,7 +286,7 @@ namespace PhysicsCPU
 
             m_common.m_nFps = nFps;
             m_common.m_fFixedDeltaTime = 1.0f / (float)m_common.m_nFps;
-            m_common.m_nNumSubIntegrates = 10;
+            m_common.m_nNumSubIntegrates = 5;
         }
 
         ~Physics()
@@ -362,6 +366,9 @@ namespace PhysicsCPU
 
             struct RigidBody rigidBody;
             rigidBody.m_fMass = 0.0f;
+            rigidBody.m_fInertiaX = 2.0f;
+            rigidBody.m_fInertiaY = 2.0f;
+            rigidBody.m_fInertiaZ = 2.0f;
             rigidBody.m_v3Force = glm::vec3(0.0f, 0.0f, 0.0f);
             rigidBody.m_v3LinearAcceleration = glm::vec3(0.0f, 0.0f, 0.0f);
             rigidBody.m_v3LinearVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -410,15 +417,15 @@ namespace PhysicsCPU
                 return orientation;
             }
 
-            // Kisz�m�tjuk a forg�si tengelyt �s sz�get
-            glm::vec3 axis = glm::normalize(angularVelocity); // A forg�s tengelye
-            float angle = glm::length(angularVelocity) * deltaTime; // A forg�s sz�ge (rad)
+            // Kiszámítjuk a forgási tengelyt és szöget
+            glm::vec3 axis = glm::normalize(angularVelocity); // A forgás tengelye
+            float angle = glm::length(angularVelocity) * deltaTime; // A forgás szöge (rad)
 
-            // L�trehozzuk a kvaterni�t a sz�gsebess�g alapj�n
+            // Létrehozzuk a kvaterniót a szögsebesség alapján
             glm::quat rotation = glm::angleAxis(angle, axis);
 
-            // Alkalmazzuk a forgat�st az eredeti kvaterni�ra
-            return glm::normalize(rotation * orientation); // A forg�st balr�l kell megszorozni
+            // Alkalmazzuk a forgatást az eredeti kvaternióra
+            return glm::normalize(rotation * orientation); // A forgást balról kell megszorozni
         }
 
         glm::vec3 ApplyLinearDamping(glm::vec3 velocity, float dampingFactor, float deltaTime) 
@@ -466,6 +473,8 @@ namespace PhysicsCPU
                     rigidBody.m_v3Position += rigidBody.m_v3LinearVelocity * dt;
                     rigidBody.m_quatOrientation = ApplyAngularVelocity(rigidBody.m_quatOrientation, rigidBody.m_v3AngularVelocity, dt);
                 }
+
+                //printf("linearVelocity: %.2f; %.2f; %.2f\n", rigidBody.m_v3LinearVelocity.x, rigidBody.m_v3LinearVelocity.y, rigidBody.m_v3LinearVelocity.z);
                 
             }//);
         }
@@ -921,141 +930,157 @@ namespace PhysicsCPU
             return false;
         }
 
+        void ResolveCollisionWithFriction(RigidBody* body, glm::vec3 collisionPoint, glm::vec3 normal)
+        {
+            int nMatId = body->m_nMaterialId;
+            Material* pMaterial = &(m_listMaterials[nMatId]);
+
+            // Ütközési normál normalizálása
+            glm::vec3 n = glm::normalize(normal);
+
+            // Relatív sebesség kiszámítása az ütközési ponton
+            glm::vec3 rBody = collisionPoint - body->m_v3Position;
+            glm::vec3 vBody = body->m_v3LinearVelocity + glm::cross(body->m_v3AngularVelocity, rBody);
+
+            // A statikus testnek nulla a sebessége és szögsebessége
+            glm::vec3 vStatic = glm::vec3(0.0f);
+
+            // Relatív sebesség a mozgó és a statikus test között
+            glm::vec3 relativeVelocity = vBody - vStatic;
+
+            // Relatív sebesség komponense az ütközési normál irányában
+            float velocityAlongNormal = glm::dot(relativeVelocity, n);
+
+            // Ha a sebesség pozitív az ütközési normál irányában, nincs ütközés
+            if (velocityAlongNormal > 0)
+            {
+                return;
+            }
+
+            // Ütközési impulzus kiszámítása az adott test rugalmassági együtthatójával
+            float restitution = pMaterial->m_fRestitution;  // Csak a mozgó test rugalmassága számít
+            float j = -(1 + restitution) * velocityAlongNormal;
+            j /= (1 / body->m_fMass);  // A statikus test tömege végtelen, így csak a mozgó test tömegét vesszük figyelembe
+
+            // Impulzus vektor a normál irányban
+            glm::vec3 impulse = j * n;
+
+            // Lineáris sebesség frissítése
+            body->m_v3LinearVelocity += impulse / body->m_fMass;
+
+            // Szögsebesség frissítése az impulzus alapján
+            glm::vec3 angularImpulse = glm::cross(rBody, impulse);
+            glm::vec3 angularAcceleration;
+            angularAcceleration.x = angularImpulse.x / body->m_fInertiaX;
+            angularAcceleration.y = angularImpulse.y / body->m_fInertiaY;
+            angularAcceleration.z = angularImpulse.z / body->m_fInertiaZ;
+            body->m_v3AngularVelocity += angularAcceleration;
+
+            // ***** Súrlódás hozzáadása *****
+
+            // Relatív sebesség tangenciális komponense
+            glm::vec3 tangentVelocity = relativeVelocity - (velocityAlongNormal * n);
+
+            // Ha van tangenciális mozgás
+            if (glm::length(tangentVelocity) > 0.001f) {
+                glm::vec3 tangent = glm::normalize(tangentVelocity);
+
+                // Súrlódási impulzus kiszámítása
+                float jt = -glm::dot(relativeVelocity, tangent);
+                jt /= (1.0f / body->m_fMass);  // Statikus test miatt csak a mozgó test tömege számít
+
+                // Súrlódási erő maximalizálása
+                float frictionCoefficient = pMaterial->m_fFriction;  // Csak a mozgó test súrlódása számít
+                glm::vec3 frictionImpulse = jt * tangent;
+
+                // Maximalizált súrlódási impulzus (Coulomb-féle súrlódás)
+                if (glm::length(frictionImpulse) > j * frictionCoefficient) {
+                    frictionImpulse = glm::normalize(frictionImpulse) * j * frictionCoefficient;
+                }
+
+                // Lineáris sebesség frissítése súrlódással
+                body->m_v3LinearVelocity += frictionImpulse / body->m_fMass;
+
+                // Szögsebesség frissítése súrlódással
+                glm::vec3 angularFrictionImpulse = glm::cross(rBody, frictionImpulse);
+                glm::vec3 angularFrictionAcceleration;
+                angularFrictionAcceleration.x = angularFrictionImpulse.x / body->m_fInertiaX;
+                angularFrictionAcceleration.y = angularFrictionImpulse.y / body->m_fInertiaY;
+                angularFrictionAcceleration.z = angularFrictionImpulse.z / body->m_fInertiaZ;
+                body->m_v3AngularVelocity += angularFrictionAcceleration;
+            }
+        }
+
+        void ResolvePenetration(Hit hit) 
+        {
+            RigidBody* bodyA = hit.m_pRigidBody1;
+            RigidBody* bodyB = hit.m_pRigidBody2;
+
+            glm::vec3 normal = glm::normalize(hit.m_v3NormalInWorld);  // Ütközési normál
+            float penetration = hit.m_fPenetration;  // Penetráció mélysége
+
+            float massA = bodyA->m_fMass <= 0.0f ? 1000000.0f : bodyA->m_fMass;
+            float massB = bodyB->m_fMass <= 0.0f ? 1000000.0f : bodyB->m_fMass;
+
+            // A mozgó testeket a penetráció mélységének arányában kell eltolni
+            float totalMass = massA + massB;
+
+            if (totalMass > 0) 
+            {
+                // Az eltolás mértéke a penetráció mélysége alapján
+                glm::vec3 correctionA(0.0f), correctionB(0.0f);
+
+                if (bodyA->m_fMass > 0.0f) 
+                {
+                    float ratioA = massB / totalMass;  // A test aránya
+                    correctionA = -normal * penetration * ratioA;
+                    bodyA->m_v3Position += correctionA;
+                }
+                
+                if (bodyB->m_fMass > 0.0f) 
+                {
+                    float ratioB = massA / totalMass;  // B test aránya
+                    correctionB = normal * penetration * ratioB;
+                    bodyB->m_v3Position += correctionB;
+                }
+            }
+        }
+
         void CollisionResponse(struct Hits *pHits) 
         {
-            // normal
+            Hit* pHit = &(pHits->m_listHits[0]);
+            for (int j = 0; j < (int)pHits->m_listHits.size(); j++) 
+            {
+                if (pHits->m_listHits[j].m_fPenetration > pHit->m_fPenetration)
+                {
+                    pHit = &(pHits->m_listHits[j]);
+                }
+            }
+            ResolvePenetration(*pHit);
+
             for (int j = 0; j < (int)pHits->m_listHits.size(); j++) 
             {
                 Hit *pHit = &(pHits->m_listHits[j]);
 
-                int nMatId = pHit->m_pRigidBody1->m_nMaterialId;
-                struct Material* pRB1Material = &(m_listMaterials[nMatId]);
-
-                // calc contact velocity
-                glm::vec3 rA = pHit->m_v3PointInWorld - pHit->m_pRigidBody1->m_v3Position;
-                glm::vec3 rB = pHit->m_v3PointInWorld - pHit->m_pRigidBody2->m_v3Position;
-                glm::vec3 v3RelVelocity = pHit->m_pRigidBody1->GetPointVelocity(rA) - pHit->m_pRigidBody2->GetPointVelocity(rB);
-                float fProjVelocity = glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld);
-
-                if (fProjVelocity <= 0.0f)
+                /*if (pHit->m_fPenetration < 0.0f)
                 {
                     continue;
-                }
+                }*/
 
-                float fInvMass1 = 0.0f;
-                if (pHit->m_pRigidBody1->m_fMass > 0.0f) { fInvMass1 = 1.0f / pHit->m_pRigidBody1->m_fMass; }
-                float fInvMass2 = 0.0f;
-                if (pHit->m_pRigidBody2->m_fMass > 0.0f) { fInvMass2 = 1.0f / pHit->m_pRigidBody2->m_fMass; }
-
-                // calc impulse
-                float nominator = -(1.0f + pRB1Material->m_fRestitution) * fProjVelocity;
-                float term1 = fInvMass1;
-                float term2 = fInvMass2;
-                float term3 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rA, pHit->m_v3NormalInWorld), rA));
-                float term4 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rB, pHit->m_v3NormalInWorld), rB));
-                float J = nominator / (term1 + term2 + term3 + term4);
-
-                //J /= (float)pHits->m_listHits.size();
-
-                // apply velocity
-                if (fInvMass1 > 0.0f)
+                // resolve collision
+                if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
                 {
-                    pHit->m_pRigidBody1->m_v3LinearVelocity += (J) * pHit->m_v3NormalInWorld;
-                    pHit->m_pRigidBody1->m_v3AngularVelocity += (J) * glm::cross(rA, pHit->m_v3NormalInWorld);
+                    ResolveCollisionWithFriction(pHit->m_pRigidBody1, pHit->m_v3PointInWorld, -pHit->m_v3NormalInWorld);
+                }
+                
+                if (pHit->m_pRigidBody2->m_fMass > 0.0f) 
+                {
+                    ResolveCollisionWithFriction(pHit->m_pRigidBody2, pHit->m_v3PointInWorld, pHit->m_v3NormalInWorld);
                 }
 
-                if (fInvMass2 > 0.0f) 
-                {
-                    pHit->m_pRigidBody2->m_v3LinearVelocity -= (J) * pHit->m_v3NormalInWorld;
-                    pHit->m_pRigidBody2->m_v3AngularVelocity -= (J) * glm::cross(rB, pHit->m_v3NormalInWorld);
-                }
             }
 
-            // tangent
-            for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
-            {
-                Hit* pHit = &(pHits->m_listHits[j]);
-
-                int nMatId = pHit->m_pRigidBody1->m_nMaterialId;
-                struct Material* pRB1Material = &(m_listMaterials[nMatId]);
-
-                // calc contact velocity
-                glm::vec3 rA = pHit->m_v3PointInWorld - pHit->m_pRigidBody1->m_v3Position;
-                glm::vec3 rB = pHit->m_v3PointInWorld - pHit->m_pRigidBody2->m_v3Position;
-                glm::vec3 v3RelVelocity = pHit->m_pRigidBody1->GetPointVelocity(rA) - pHit->m_pRigidBody2->GetPointVelocity(rB);
-                float fProjVelocity = glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld);
-
-                if (fProjVelocity <= 0.0f)
-                {
-                    continue;
-                }
-
-                glm::vec3 v3Tangent = v3RelVelocity - (glm::dot(v3RelVelocity, pHit->m_v3NormalInWorld) * pHit->m_v3NormalInWorld);
-
-                float fInvMass1 = 0.0f;
-                if (pHit->m_pRigidBody1->m_fMass > 0.0f) { fInvMass1 = 1.0f / pHit->m_pRigidBody1->m_fMass; }
-                float fInvMass2 = 0.0f;
-                if (pHit->m_pRigidBody2->m_fMass > 0.0f) { fInvMass2 = 1.0f / pHit->m_pRigidBody2->m_fMass; }
-
-                // calc impulse
-                float nominator = -glm::dot(v3RelVelocity, v3Tangent);
-                float term1 = fInvMass1;
-                float term2 = fInvMass2;
-                float term3 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rA, v3Tangent), rA));
-                float term4 = glm::dot(pHit->m_v3NormalInWorld, glm::cross(glm::cross(rB, v3Tangent), rB));
-                float J = nominator / (term1 + term2 + term3 + term4);
-
-                //J /= (float)pHits->m_listHits.size();
-
-                // apply velocity
-                if (fInvMass1 > 0.0f)
-                {
-                    pHit->m_pRigidBody1->m_v3LinearVelocity += (J)*v3Tangent;
-                    pHit->m_pRigidBody1->m_v3AngularVelocity += (J)*glm::cross(rA, v3Tangent);
-                }
-
-                if (fInvMass2 > 0.0f)
-                {
-                    pHit->m_pRigidBody2->m_v3LinearVelocity -= (J)*v3Tangent;
-                    pHit->m_pRigidBody2->m_v3AngularVelocity -= (J)*glm::cross(rB, v3Tangent);
-                }
-            }
-
-            // separate
-            glm::vec3 v3NormalInWorld = glm::vec3(0, 0, 0);
-            float fMaxPenetration = 0.0f;
-
-            for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
-            {
-                Hit* pHit = &(pHits->m_listHits[j]);
-
-                if (pHit->m_fPenetration > fMaxPenetration) 
-                {
-                    fMaxPenetration = pHit->m_fPenetration;
-                    v3NormalInWorld = pHit->m_v3NormalInWorld;
-                }
-            }
-
-            glm::vec3 v3Translate = v3NormalInWorld * fMaxPenetration;
-            Hit* pHit = &(pHits->m_listHits[0]);
-            float fMass1 = pHit->m_pRigidBody1->m_fMass; if (fMass1 <= 0.0f) { fMass1 = FLT_MAX; }
-            float fMass2 = pHit->m_pRigidBody2->m_fMass; if (fMass2 <= 0.0f) { fMass2 = FLT_MAX; }
-
-            if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
-            {
-                float fWeight12 = std::fmax(0.0f, glm::dot(glm::normalize(-v3Translate), glm::normalize(-m_common.m_v3Gravity)));
-                float fWeight1 = fMass2 / (fMass1 + fMass2);
-                pHit->m_pRigidBody1->m_v3Position -= v3Translate * fWeight1 * fWeight12;
-                //pHit->m_pRigidBody1->m_v3LinearVelocity *= 0.9f * m_common.m_fFixedDeltaTime;
-            }
-
-            if (pHit->m_pRigidBody2->m_fMass > 0.0f) 
-            {
-                float fWeight22 = std::fmax(0.0f, glm::dot(glm::normalize(v3Translate), glm::normalize(-m_common.m_v3Gravity)));
-                float fWeight2 = fMass1 / (fMass1 + fMass2);
-                pHit->m_pRigidBody2->m_v3Position += v3Translate * fWeight2 * fWeight22;
-                //pHit->m_pRigidBody2->m_v3LinearVelocity *= 0.9f * m_common.m_fFixedDeltaTime;
-            }
+            
 
         }
 	};
