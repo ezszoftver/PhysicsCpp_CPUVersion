@@ -1013,8 +1013,11 @@ namespace PhysicsCPU
 
         void ResolveCollisionWithFriction(RigidBody* body, RigidBody* otherBody, glm::vec3 collisionPoint, glm::vec3 normal)
         {
-            int nMatId = body->m_nMaterialId;
-            Material* pMaterial = &(m_listMaterials[nMatId]);
+            int nMat1Id = body->m_nMaterialId;
+            Material* pMaterial1 = &(m_listMaterials[nMat1Id]);
+
+            int nMat2Id = otherBody->m_nMaterialId;
+            Material* pMaterial2 = &(m_listMaterials[nMat2Id]);
 
             // Ütközési normál normalizálása
             glm::vec3 n = glm::normalize(normal);
@@ -1039,7 +1042,7 @@ namespace PhysicsCPU
             }
 
             // Ütközési impulzus kiszámítása az adott test rugalmassági együtthatójával
-            float restitution = pMaterial->m_fRestitution;  // Csak a mozgó test rugalmassága számít
+            float restitution = (pMaterial1->m_fRestitution + pMaterial2->m_fRestitution) / 2.0f;  // Csak a mozgó test rugalmassága számít
             float j = -(1 + restitution) * velocityAlongNormal;
             j /= (1 / body->m_fMass + 1 / otherBody->m_fMass);  // A statikus test tömege végtelen, így csak a mozgó test tömegét vesszük figyelembe
 
@@ -1071,7 +1074,7 @@ namespace PhysicsCPU
                 jt /= (1.0f / body->m_fMass + 1 / otherBody->m_fMass);  // Statikus test miatt csak a mozgó test tömege számít
 
                 // Súrlódási erő maximalizálása
-                float frictionCoefficient = pMaterial->m_fFriction;  // Csak a mozgó test súrlódása számít
+                float frictionCoefficient = sqrt(pMaterial1->m_fFriction * pMaterial2->m_fFriction);  // Csak a mozgó test súrlódása számít
                 glm::vec3 frictionImpulse = jt * tangent;
 
                 // Maximalizált súrlódási impulzus (Coulomb-féle súrlódás)
