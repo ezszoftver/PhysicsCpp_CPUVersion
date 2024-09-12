@@ -1011,6 +1011,87 @@ namespace PhysicsCPU
             }
         }
 
+        void ResolveCollisionWithFriction(RigidBody* body, RigidBody* otherBody, glm::vec3 collisionPoint, glm::vec3 normal)
+        {
+            int nMatId = body->m_nMaterialId;
+            Material* pMaterial = &(m_listMaterials[nMatId]);
+
+            // Ütközési normál normalizálása
+            glm::vec3 n = glm::normalize(normal);
+
+            // Relatív sebesség kiszámítása az ütközési ponton
+            glm::vec3 rBody = collisionPoint - body->m_v3Position;
+            glm::vec3 rOtherBody = collisionPoint - otherBody->m_v3Position;
+
+            glm::vec3 vBody = body->m_v3LinearVelocity + glm::cross(body->m_v3AngularVelocity, rBody);
+            glm::vec3 vOtherBody = otherBody->m_v3LinearVelocity + glm::cross(otherBody->m_v3AngularVelocity, rOtherBody);
+
+            // Relatív sebesség a mozgó és a statikus test között
+            glm::vec3 relativeVelocity = vBody - vOtherBody;
+
+            // Relatív sebesség komponense az ütközési normál irányában
+            float velocityAlongNormal = glm::dot(relativeVelocity, n);
+
+            // Ha a sebesség pozitív az ütközési normál irányában, nincs ütközés
+            if (velocityAlongNormal > 0)
+            {
+                return;
+            }
+
+            // Ütközési impulzus kiszámítása az adott test rugalmassági együtthatójával
+            float restitution = pMaterial->m_fRestitution;  // Csak a mozgó test rugalmassága számít
+            float j = -(1 + restitution) * velocityAlongNormal;
+            j /= (1 / body->m_fMass + 1 / otherBody->m_fMass);  // A statikus test tömege végtelen, így csak a mozgó test tömegét vesszük figyelembe
+
+            // Impulzus vektor a normál irányban
+            glm::vec3 impulse = j * n;
+
+            // Lineáris sebesség frissítése
+            body->m_v3LinearVelocity += impulse / body->m_fMass;
+            otherBody->m_v3LinearVelocity -= impulse / otherBody->m_fMass;
+
+            // Szögsebesség frissítése az impulzus alapján
+            glm::vec3 angularImpulse = glm::cross(rBody, impulse);
+            body->m_v3AngularVelocity += angularImpulse;
+
+            glm::vec3 angularImpulse2 = glm::cross(rOtherBody, impulse);
+            otherBody->m_v3AngularVelocity -= angularImpulse2;
+
+            // ***** Súrlódás hozzáadása *****
+
+            // Relatív sebesség tangenciális komponense
+            glm::vec3 tangentVelocity = relativeVelocity - (velocityAlongNormal * n);
+
+            // Ha van tangenciális mozgás
+            if (glm::length(tangentVelocity) > 0.001f) {
+                glm::vec3 tangent = glm::normalize(tangentVelocity);
+
+                // Súrlódási impulzus kiszámítása
+                float jt = -glm::dot(relativeVelocity, tangent);
+                jt /= (1.0f / body->m_fMass + 1 / otherBody->m_fMass);  // Statikus test miatt csak a mozgó test tömege számít
+
+                // Súrlódási erő maximalizálása
+                float frictionCoefficient = pMaterial->m_fFriction;  // Csak a mozgó test súrlódása számít
+                glm::vec3 frictionImpulse = jt * tangent;
+
+                // Maximalizált súrlódási impulzus (Coulomb-féle súrlódás)
+                if (glm::length(frictionImpulse) > j * frictionCoefficient) {
+                    frictionImpulse = glm::normalize(frictionImpulse) * j * frictionCoefficient;
+                }
+
+                // Lineáris sebesség frissítése súrlódással
+                body->m_v3LinearVelocity += frictionImpulse / body->m_fMass;
+                otherBody->m_v3LinearVelocity -= frictionImpulse / otherBody->m_fMass;
+
+                // Szögsebesség frissítése súrlódással
+                glm::vec3 angularFrictionImpulse = glm::cross(rBody, frictionImpulse);
+                body->m_v3AngularVelocity += angularFrictionImpulse;
+
+                glm::vec3 angularFrictionImpulse2 = glm::cross(rOtherBody, frictionImpulse);
+                otherBody->m_v3AngularVelocity -= angularFrictionImpulse2;
+            }
+        }
+
         void ResolvePenetration(Hit hit) 
         {
             RigidBody* bodyA = hit.m_pRigidBody1;
@@ -1068,12 +1149,15 @@ namespace PhysicsCPU
                 }*/
 
                 // resolve collision
-                if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
+                if (pHit->m_pRigidBody1->m_fMass > 0.0f && pHit->m_pRigidBody2->m_fMass > 0.0f) 
+                {
+                    ResolveCollisionWithFriction(pHit->m_pRigidBody1, pHit->m_pRigidBody2, pHit->m_v3PointInWorld, -pHit->m_v3NormalInWorld);
+                }
+                else if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
                 {
                     ResolveCollisionWithFriction(pHit->m_pRigidBody1, pHit->m_v3PointInWorld, -pHit->m_v3NormalInWorld);
                 }
-                
-                if (pHit->m_pRigidBody2->m_fMass > 0.0f) 
+                else if (pHit->m_pRigidBody2->m_fMass > 0.0f) 
                 {
                     ResolveCollisionWithFriction(pHit->m_pRigidBody2, pHit->m_v3PointInWorld, pHit->m_v3NormalInWorld);
                 }
