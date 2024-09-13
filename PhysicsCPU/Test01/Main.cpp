@@ -99,6 +99,7 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	int bodyId = pPhysics->GenRigidBody();
 	Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(bodyId);
 	pRigidBody->m_fMass = fMass;
+	pRigidBody->m_fInertia = 1.0f;
 	pRigidBody->m_v3Position = v3Position;
 	pRigidBody->m_quatOrientation = quatOrientation;
 	pRigidBody->m_nConvexTriMeshId = meshId;
@@ -117,16 +118,16 @@ bool Init()
 {
 	glEnable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glPointSize(10.0f);
 	glEnable(GL_POINT_SMOOTH);
 	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
 	// physics
 	pPhysics = new Physics(200);
-	pPhysics->SetGravity(glm::vec3(0.0f, -5.0f, 0.0f));
+	pPhysics->SetGravity(glm::vec3(0.0f, -1.0f, 0.0f));
 
-	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(-20.0f, 0.0f, 0.0f))), glm::vec3(3, 0.1, 3), 0.0f);
+	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(5, 0.1, 5), 0.0f);
 
 	for (int i = 0; i < 5; i++) 
 	{
@@ -136,7 +137,7 @@ bool Init()
 	//CreateCube(glm::vec3(0, 2.0f, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	// camera
-	m_Camera.Init(glm::vec3(15, 1, 0), glm::vec3(0, 0, 0));
+	m_Camera.Init(glm::vec3(5, 5, 7), glm::vec3(0, 0, 0));
 	// hide cursor
 	glfwSetInputMode(pWindow, GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
 
@@ -154,6 +155,8 @@ void Exit()
 
 void DebugDraw()
 {
+	glm::vec3 v3LightDir = glm::normalize(glm::vec3(-0.3f, -1.0f, 0.3f));
+
 	// draw triangles
 	glPushMatrix();
 	glBegin(GL_TRIANGLES);
@@ -175,6 +178,14 @@ void DebugDraw()
 			glm::vec3 v3B = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalB, 1));
 			glm::vec3 v3C = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalC, 1));
 		
+			glm::vec3 v3Normal = glm::normalize(glm::cross(v3B - v3A, v3C - v3A));
+
+			// dir light
+			float ambientIntensity = 0.3f;
+			float diffuseIntensity = ambientIntensity + std::fmax(glm::dot(v3Normal, -v3LightDir), 0.0f);
+
+			glColor4f(diffuseIntensity, 0, 0, 1.0f);
+
 			glVertex3f(v3A.x, v3A.y, v3A.z);
 			glVertex3f(v3B.x, v3B.y, v3B.z);
 			glVertex3f(v3C.x, v3C.y, v3C.z);

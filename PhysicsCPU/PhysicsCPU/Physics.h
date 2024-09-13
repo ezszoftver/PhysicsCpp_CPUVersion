@@ -79,9 +79,7 @@ namespace PhysicsCPU
         {
             float m_fMass;
             
-            float m_fInertiaX;  // Tehetetlenségi nyomaték x tengely körül
-            float m_fInertiaY;  // Tehetetlenségi nyomaték y tengely körül
-            float m_fInertiaZ;  // Tehetetlenségi nyomaték z tengely körül
+            float m_fInertia;  // Tehetetlenségi nyomaték x tengely körül
 
             glm::vec3 m_v3Force;
             glm::vec3 m_v3LinearAcceleration;
@@ -286,7 +284,7 @@ namespace PhysicsCPU
 
             m_common.m_nFps = nFps;
             m_common.m_fFixedDeltaTime = 1.0f / (float)m_common.m_nFps;
-            m_common.m_nNumSubIntegrates = 5;
+            m_common.m_nNumSubIntegrates = 10;
         }
 
         ~Physics()
@@ -366,9 +364,7 @@ namespace PhysicsCPU
 
             struct RigidBody rigidBody;
             rigidBody.m_fMass = 0.0f;
-            rigidBody.m_fInertiaX = 2.0f;
-            rigidBody.m_fInertiaY = 2.0f;
-            rigidBody.m_fInertiaZ = 2.0f;
+            rigidBody.m_fInertia = 5.0f;
             rigidBody.m_v3Force = glm::vec3(0.0f, 0.0f, 0.0f);
             rigidBody.m_v3LinearAcceleration = glm::vec3(0.0f, 0.0f, 0.0f);
             rigidBody.m_v3LinearVelocity = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -970,11 +966,7 @@ namespace PhysicsCPU
 
             // Szögsebesség frissítése az impulzus alapján
             glm::vec3 angularImpulse = glm::cross(rBody, impulse);
-            glm::vec3 angularAcceleration;
-            angularAcceleration.x = angularImpulse.x / body->m_fInertiaX;
-            angularAcceleration.y = angularImpulse.y / body->m_fInertiaY;
-            angularAcceleration.z = angularImpulse.z / body->m_fInertiaZ;
-            body->m_v3AngularVelocity += angularAcceleration;
+            body->m_v3AngularVelocity += angularImpulse / body->m_fInertia;
 
             // ***** Súrlódás hozzáadása *****
 
@@ -1003,11 +995,7 @@ namespace PhysicsCPU
 
                 // Szögsebesség frissítése súrlódással
                 glm::vec3 angularFrictionImpulse = glm::cross(rBody, frictionImpulse);
-                glm::vec3 angularFrictionAcceleration;
-                angularFrictionAcceleration.x = angularFrictionImpulse.x / body->m_fInertiaX;
-                angularFrictionAcceleration.y = angularFrictionImpulse.y / body->m_fInertiaY;
-                angularFrictionAcceleration.z = angularFrictionImpulse.z / body->m_fInertiaZ;
-                body->m_v3AngularVelocity += angularFrictionAcceleration;
+                body->m_v3AngularVelocity += angularFrictionImpulse / body->m_fInertia;
             }
         }
 
@@ -1055,10 +1043,10 @@ namespace PhysicsCPU
 
             // Szögsebesség frissítése az impulzus alapján
             glm::vec3 angularImpulse = glm::cross(rBody, impulse);
-            body->m_v3AngularVelocity += angularImpulse;
+            body->m_v3AngularVelocity += angularImpulse / body->m_fInertia;
 
             glm::vec3 angularImpulse2 = glm::cross(rOtherBody, impulse);
-            otherBody->m_v3AngularVelocity -= angularImpulse2;
+            otherBody->m_v3AngularVelocity -= angularImpulse2 / otherBody->m_fInertia;
 
             // ***** Súrlódás hozzáadása *****
 
@@ -1088,10 +1076,10 @@ namespace PhysicsCPU
 
                 // Szögsebesség frissítése súrlódással
                 glm::vec3 angularFrictionImpulse = glm::cross(rBody, frictionImpulse);
-                body->m_v3AngularVelocity += angularFrictionImpulse;
+                body->m_v3AngularVelocity += angularFrictionImpulse / body->m_fInertia;
 
                 glm::vec3 angularFrictionImpulse2 = glm::cross(rOtherBody, frictionImpulse);
-                otherBody->m_v3AngularVelocity -= angularFrictionImpulse2;
+                otherBody->m_v3AngularVelocity -= angularFrictionImpulse2 / otherBody->m_fInertia;
             }
         }
 
