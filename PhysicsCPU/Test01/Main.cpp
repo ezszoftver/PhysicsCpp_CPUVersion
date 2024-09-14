@@ -192,7 +192,14 @@ void DebugDraw()
 			float ambientIntensity = 0.3f;
 			float diffuseIntensity = ambientIntensity + std::fmax(glm::dot(v3Normal, -v3LightDir), 0.0f);
 
-			glColor4f(diffuseIntensity, 0, 0, 1.0f);
+			if (pRigidBody->m_fMass > 0.0f) 
+			{
+				glColor4f(diffuseIntensity, 0, 0, 1.0f);
+			}
+			else 
+			{
+				glColor4f(0, diffuseIntensity, 0, 1.0f);
+			}
 
 			glVertex3f(v3A.x, v3A.y, v3A.z);
 			glVertex3f(v3B.x, v3B.y, v3B.z);

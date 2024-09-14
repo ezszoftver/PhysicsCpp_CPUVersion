@@ -106,7 +106,7 @@ namespace PhysicsCPU
             glm::mat3 GetInvInertia() 
             {
                 glm::mat3 rot = glm::mat3_cast(m_quatOrientation);  // quaternion -> rotation matrix
-                glm::mat3 inertiaWorld = rot * m_mat3InvInertia * glm::transpose(rot);
+                glm::mat3 inertiaWorld = rot * (m_mat3InvInertia * glm::transpose(rot));
                 return inertiaWorld;
             }
             
@@ -950,7 +950,7 @@ namespace PhysicsCPU
             glm::vec3 impulse = j * normal;
 
             body->m_v3LinearVelocity += impulse / body->m_fMass; // impulzus változás
-            body->m_v3AngularVelocity += glm::cross(rA, impulse) * body->GetInvInertia(); // perdület változás
+            body->m_v3AngularVelocity += body->GetInvInertia() * glm::cross(rA, impulse); // perdület változás
 
             // ***** Súrlódás hozzáadása *****
             glm::vec3 tangentVelocity = velocity - (velocityAlongNormal * normal);
@@ -1022,10 +1022,10 @@ namespace PhysicsCPU
             glm::vec3 impulse = j * normal;
 
             body->m_v3LinearVelocity += impulse / body->m_fMass;
-            body->m_v3AngularVelocity += glm::cross(rA, impulse) * body->GetInvInertia();
+            body->m_v3AngularVelocity += body->GetInvInertia() * glm::cross(rA, impulse);
 
             otherBody->m_v3LinearVelocity -= impulse / otherBody->m_fMass;
-            otherBody->m_v3AngularVelocity -= glm::cross(rB, impulse) * otherBody->GetInvInertia();
+            otherBody->m_v3AngularVelocity -= otherBody->GetInvInertia() * glm::cross(rB, impulse);
 
             // ***** Súrlódás hozzáadása *****
             glm::vec3 tangentVelocity = relativeVelocity - (velocityAlongNormal * normal);
