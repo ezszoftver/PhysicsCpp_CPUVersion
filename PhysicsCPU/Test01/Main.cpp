@@ -22,7 +22,7 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	int matId = pPhysics->GenMaterial();
 	Physics::Material* pMaterial = pPhysics->GetMaterial(matId);
 	pMaterial->m_fRestitution = 0.0f;
-	pMaterial->m_fFriction = 2.0f;
+	pMaterial->m_fFriction = 1.0f;
 
 	int meshId = pPhysics->GenConvexTriMesh();
 	Physics::ConvexTriMesh* pMesh = pPhysics->GetConvexTriMesh(meshId);
@@ -104,8 +104,8 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	pRigidBody->m_nConvexTriMeshId = meshId;
 	pRigidBody->m_nMaterialId = matId;
 
-	pRigidBody->m_fLinearDamping = 0.1f;
-	pRigidBody->m_fAngularDamping = 0.1f;
+	pRigidBody->m_fLinearDamping = 0.5f;
+	pRigidBody->m_fAngularDamping = 0.5f;
 
 	if (fMass > 0.0f) 
 	{
@@ -115,9 +115,9 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 		float m = fMass;
 
 		pRigidBody->m_mat3InvInertia = glm::mat3(
-			/*1.0f /*/ (m * (1.0f / 12.0f) * (b * b + c * c)), 0.0f, 0.0f,  // Ix^{-1}
-			0.0f, /*1.0f /*/ (m * (1.0f / 12.0f) * (a * a + c * c)), 0.0f,  // Iy^{-1}
-			0.0f, 0.0f, /*1.0f /*/ (m * (1.0f / 12.0f) * (a * a + b * b))   // Iz^{-1}
+			1.0f / (m * (1.0f / 12.0f) * (b * b + c * c)), 0.0f, 0.0f,  // Ix^{-1}
+			0.0f, 1.0f / (m * (1.0f / 12.0f) * (a * a + c * c)), 0.0f,  // Iy^{-1}
+			0.0f, 0.0f, 1.0f / (m * (1.0f / 12.0f) * (a * a + b * b))   // Iz^{-1}
 		);
 	}
 }
@@ -132,14 +132,14 @@ bool Init()
 	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
 	// physics
-	pPhysics = new Physics(100);
-	pPhysics->SetGravity(glm::vec3(0.0f, -1.0f, 0.0f));
+	pPhysics = new Physics(200);
+	pPhysics->SetGravity(glm::vec3(0.0f, -10.0f, 0.0f));
 
 	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(5, 0.1, 5), 0.0f);
 
-	for (int i = 0; i < 1; i++) 
+	for (int i = 0; i < 5; i++) 
 	{
-		CreateCube(glm::vec3(0, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(20.0f, 0.0f, 0.0f))), glm::vec3(1.0f, 0.2f, 0.5f), 1.0f);
+		CreateCube(glm::vec3(0, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(1.0f, 0.2f, 0.5f), 10.0f);
 	}
 
 	//CreateCube(glm::vec3(0, 2.0f, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
