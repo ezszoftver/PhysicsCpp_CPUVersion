@@ -97,6 +97,7 @@ namespace PhysicsCPU
 
             int32_t m_nConvexTriMeshId;
             int16_t m_nMaterialId;
+            int32_t m_nHitId;
 
             glm::vec3 GetPointVelocity(glm::vec3 v3Point)
             {
@@ -114,19 +115,21 @@ namespace PhysicsCPU
 
         struct Hit 
         {
-            RigidBody *m_pRigidBody1 = nullptr;
+            //RigidBody *m_pRigidBody1 = nullptr;
             RigidBody *m_pRigidBody2 = nullptr;
 
             glm::vec3 m_v3PointInWorld = glm::vec3(0, 0, 0);
             glm::vec3 m_v3NormalInWorld = glm::vec3(0, 0, 0);
             float m_fPenetration = 0.0f;
 
-            struct Hit Invert() 
+            struct Hit Invert()
             {
                 struct Hit ret;
 
-                ret.m_pRigidBody1 = m_pRigidBody2;
-                ret.m_pRigidBody2 = m_pRigidBody1;
+                //ret.m_pRigidBody1 = m_pRigidBody2;
+                //ret.m_pRigidBody2 = m_pRigidBody1;
+                ret.m_pRigidBody2 = m_pRigidBody2;
+
                 ret.m_fPenetration = m_fPenetration;
                 ret.m_v3PointInWorld = m_v3PointInWorld;
                 ret.m_v3NormalInWorld = -m_v3NormalInWorld;
@@ -284,6 +287,7 @@ namespace PhysicsCPU
         std::vector<struct Material> m_listMaterials;
         std::vector<struct ConvexTriMesh> m_listConvexTriMeshs;
         std::vector<struct RigidBody> m_listRigidBodies;
+        std::vector<struct Hits> m_listHits;
 
         Physics(int16_t nFps = 60)
         {
@@ -291,7 +295,7 @@ namespace PhysicsCPU
 
             m_common.m_nFps = nFps;
             m_common.m_fFixedDeltaTime = 1.0f / (float)m_common.m_nFps;
-            m_common.m_nNumSubIntegrates = 5;
+            m_common.m_nNumSubIntegrates = 10;
         }
 
         ~Physics()
@@ -386,6 +390,11 @@ namespace PhysicsCPU
             rigidBody.m_nConvexTriMeshId = -1;
             rigidBody.m_nMaterialId = -1;
             
+            int32_t nHitId = (int32_t)m_listHits.size();
+            rigidBody.m_nHitId = nHitId;
+            struct Hits hits;
+            m_listHits.push_back(hits);
+
             m_listRigidBodies.push_back(rigidBody);
 
             return nId;
@@ -409,7 +418,9 @@ namespace PhysicsCPU
 
             UpdateBVHTree();
 
-            CollisionDetectionAndResponse();
+            CollisionDetection();
+            CollisionResponse();
+            
             UpdateTransforms();
         }
 
@@ -774,14 +785,29 @@ namespace PhysicsCPU
 
                 if (true == IsInside(v3Point, pConvexPlanes2)) 
                 {
-                    struct Hit hit;
-                    hit.m_pRigidBody1 = pRigidBody1;
-                    hit.m_pRigidBody2 = pRigidBody2;
-                    hit.m_v3PointInWorld = v3Point;
-                    hit.m_v3NormalInWorld = v3Normal;
-                    hit.m_fPenetration = std::fabs(fPenetration);
+                    //if (pRigidBody2->m_fMass > 0.0f)
+                    {
+                        struct Hit hit;
+                        //hit.m_pRigidBody1 = pRigidBody1;
+                        hit.m_pRigidBody2 = pRigidBody2;
+                        hit.m_v3PointInWorld = v3Point;
+                        hit.m_v3NormalInWorld = v3Normal;
+                        hit.m_fPenetration = std::fabs(fPenetration);
 
-                    (*pHits).m_listHits.push_back(hit);
+                        (*pHits).m_listHits.push_back(hit);
+                    }
+
+                    /*if (pRigidBody2->m_fMass > 0.0f)
+                    {
+                        struct Hit hit;
+                        //hit.m_pRigidBody1 = pRigidBody1;
+                        hit.m_pRigidBody2 = pRigidBody2;
+                        hit.m_v3PointInWorld = v3Point;
+                        hit.m_v3NormalInWorld = -v3Normal;
+                        hit.m_fPenetration = std::fabs(fPenetration);
+
+                        (*pHits).m_listHits.push_back(hit);
+                    }*/
                 }
             }
             
@@ -797,14 +823,29 @@ namespace PhysicsCPU
                     glm::vec3 v3Point;
                     if (true == Physics::IntersectPlaneLine(pPlane, pLine, &v3Point) && true == IsInside(v3Point, pConvexPlanes2))
                     {
-                        struct Hit hit;
-                        hit.m_pRigidBody1 = pRigidBody1;
-                        hit.m_pRigidBody2 = pRigidBody2;
-                        hit.m_v3PointInWorld = v3Point;
-                        hit.m_v3NormalInWorld = v3Normal;
-                        hit.m_fPenetration = std::fabs(fPenetration);
+                        //if (pRigidBody2->m_fMass > 0.0f)
+                        {
+                            struct Hit hit;
+                            //hit.m_pRigidBody1 = pRigidBody1;
+                            hit.m_pRigidBody2 = pRigidBody2;
+                            hit.m_v3PointInWorld = v3Point;
+                            hit.m_v3NormalInWorld = v3Normal;
+                            hit.m_fPenetration = std::fabs(fPenetration);
 
-                        (*pHits).m_listHits.push_back(hit);
+                            (*pHits).m_listHits.push_back(hit);
+                        }
+
+                        /*if (pRigidBody2->m_fMass > 0.0f)
+                        {
+                            struct Hit hit;
+                            //hit.m_pRigidBody1 = pRigidBody1;
+                            hit.m_pRigidBody2 = pRigidBody2;
+                            hit.m_v3PointInWorld = v3Point;
+                            hit.m_v3NormalInWorld = -v3Normal;
+                            hit.m_fPenetration = std::fabs(fPenetration);
+
+                            (*pHits).m_listHits.push_back(hit);
+                        }*/
                     }
 
                 }
@@ -812,7 +853,7 @@ namespace PhysicsCPU
 
         }
 
-        bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2, struct Hits *pHits)
+        bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2, Hits* pHits)
         {
             if (pRigidBody1->m_fMass <= 0.0f && pRigidBody2->m_fMass <= 0.0f) 
             {
@@ -865,7 +906,6 @@ namespace PhysicsCPU
             GeneratePlanesAndLines(pRigidBody1, &listRB1LocalTriangles, &listRB1Planes, &listRB1Lines);
             GeneratePlanesAndLines(pRigidBody2, &listRB2LocalTriangles, &listRB2Planes, &listRB2Lines);
             
-            pHits->Clear();
             for (int i = 0; i < (int)listRB1LocalTriangles.size(); i++)
             {
                 Plane *pConvexPlanes1 = &(listRB1Planes[i * 4]);
@@ -878,14 +918,14 @@ namespace PhysicsCPU
 
                     GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, fPenetration, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2, pHits);
 
-                    struct Hits hits2;
+                    /*struct Hits hits2;
                     GenerateHits(pRigidBody2, pRigidBody1, v3RB2Dir, fPenetration, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1, &hits2);
 
                     for (int j = 0; j < (int)hits2.m_listHits.size(); j++)
                     {
                         struct Hit hit2 = hits2.m_listHits[j];
-                        pHits->m_listHits.push_back( hit2.Invert() );
-                    }
+                        pHits->m_listHits.push_back( hit2.Invert());
+                    }*/
 
                 }
             }
@@ -894,23 +934,22 @@ namespace PhysicsCPU
             //return true;
         }
 
-        void CollisionDetectionAndResponse() 
+        void CollisionDetection() 
         {
             for (int i = 0; i < m_listRigidBodies.size(); i++)
             {
                 struct RigidBody *pRigidBody1 = &(m_listRigidBodies[i]);
+                struct Hits* pHits = &(m_listHits[pRigidBody1->m_nHitId]);
+
+                pHits->Clear();
 
                 for (int j = 0; j < m_listRigidBodies.size(); j++) 
                 {
                     struct RigidBody* pRigidBody2 = &(m_listRigidBodies[j]);
 
-                    if (i < j) 
+                    if (i != j) 
                     {
-                        struct Hits hits;
-                        if (true == CollisionDetection(pRigidBody1, pRigidBody2, &hits)) 
-                        {
-                            CollisionResponse(&hits);
-                        }
+                        CollisionDetection(pRigidBody1, pRigidBody2, pHits);
                     }
 
                 }
@@ -995,162 +1034,87 @@ namespace PhysicsCPU
             }
         }
 
-        void ResolveCollisionWithFriction(RigidBody* body, RigidBody* otherBody, glm::vec3 collisionPoint, glm::vec3 normal)
-        {
-            int nMatId1 = body->m_nMaterialId;
-            int nMatId2 = otherBody->m_nMaterialId;
-            Material* pMaterial1 = &(m_listMaterials[nMatId1]);
-            Material* pMaterial2 = &(m_listMaterials[nMatId2]);
-
-            glm::vec3 rA = collisionPoint - body->m_v3Position;
-            glm::vec3 rB = collisionPoint - otherBody->m_v3Position;
-
-            glm::vec3 vA = body->m_v3LinearVelocity + glm::cross(body->m_v3AngularVelocity, rA);
-            glm::vec3 vB = otherBody->m_v3LinearVelocity + glm::cross(otherBody->m_v3AngularVelocity, rB);
-
-            glm::vec3 relativeVelocity = vA - vB;
-            float velocityAlongNormal = glm::dot(normal, relativeVelocity);
-
-            if (velocityAlongNormal > 0) return;
-            
-            float restitution = (pMaterial1->m_fRestitution + pMaterial2->m_fRestitution) / 2.0f;
-            float j = -(1.0f + restitution) * velocityAlongNormal;
-            j /= (1.0f / body->m_fMass + 1.0f / otherBody->m_fMass +
-                glm::dot(glm::cross(body->GetInvInertia() * glm::cross(rA, normal), rA), normal) +
-                glm::dot(glm::cross(otherBody->GetInvInertia() * glm::cross(rB, normal), rB), normal));
-
-            glm::vec3 impulse = j * normal;
-
-            body->m_v3LinearVelocity += impulse / body->m_fMass;
-            body->m_v3AngularVelocity += body->GetInvInertia() * glm::cross(rA, impulse);
-
-            otherBody->m_v3LinearVelocity -= impulse / otherBody->m_fMass;
-            otherBody->m_v3AngularVelocity -= otherBody->GetInvInertia() * glm::cross(rB, impulse);
-
-            // ***** Súrlódás hozzáadása *****
-            glm::vec3 tangentVelocity = relativeVelocity - (velocityAlongNormal * normal);
-
-            if (glm::length(tangentVelocity) > 0.0001f)
-            {
-                glm::vec3 tangent = glm::normalize(tangentVelocity);
-
-                float velocityAlongTangent = glm::dot(relativeVelocity, tangent);
-                if (velocityAlongTangent < 0) return;
-
-                // Kiszámítjuk az angularImpulse-okat
-                glm::vec3 crossRT_A = glm::cross(rA, tangent);
-                glm::vec3 angularImpulse_A = glm::cross(body->GetInvInertia() * crossRT_A, rA);
-
-                glm::vec3 crossRT_B = glm::cross(rB, tangent);
-                glm::vec3 angularImpulse_B = glm::cross(otherBody->GetInvInertia() * crossRT_B, rB);
-
-                // Súrlódási impulzus kiszámítása
-                float m_inv_A = 1.0f / body->m_fMass;
-                float m_inv_B = 1.0f / otherBody->m_fMass;
-
-                float denominator = m_inv_A + m_inv_B +
-                    glm::dot(angularImpulse_A, tangent) +
-                    glm::dot(angularImpulse_B, tangent);
-
-                float jt = -velocityAlongTangent / denominator;
-
-                // Maximális súrlódási impulzus
-                float maxFrictionImpulse = (body->m_fMass + otherBody->m_fMass) * (pMaterial1->m_fFriction + pMaterial2->m_fFriction) / 2.0f;
-
-                // Az impulzus vektor
-                glm::vec3 frictionImpulse = jt * tangent;
-
-                // Korlátozd az impulzus értékét a maximális súrlódási impulzusra
-                if (glm::length(frictionImpulse) > maxFrictionImpulse)
-                {
-                    frictionImpulse = glm::normalize(frictionImpulse) * maxFrictionImpulse;
-                }
-
-                // Lineáris sebesség frissítése súrlódással
-                body->m_v3LinearVelocity += frictionImpulse / body->m_fMass;
-                otherBody->m_v3LinearVelocity -= frictionImpulse / otherBody->m_fMass;
-
-                // Szögsebesség frissítése súrlódással
-                glm::vec3 angularFrictionImpulse_A = glm::cross(rA, frictionImpulse);
-                glm::vec3 angularFrictionAcceleration_A = body->GetInvInertia() * angularFrictionImpulse_A;
-                body->m_v3AngularVelocity += angularFrictionAcceleration_A;
-
-                glm::vec3 angularFrictionImpulse_B = glm::cross(rB, frictionImpulse);
-                glm::vec3 angularFrictionAcceleration_B = otherBody->GetInvInertia() * angularFrictionImpulse_B;
-                otherBody->m_v3AngularVelocity -= angularFrictionAcceleration_B;
-            }
-        }
-
         void ResolvePenetration(Hit hit) 
         {
-            //RigidBody* bodyA = hit.m_pRigidBody1;
             RigidBody* bodyB = hit.m_pRigidBody2;
 
             glm::vec3 normal = glm::normalize(hit.m_v3NormalInWorld);  // Ütközési normál
             float penetration = hit.m_fPenetration;  // Penetráció mélysége
 
-            //float massA = bodyA->m_fMass <= 0.0f ? 1000000.0f : bodyA->m_fMass;
-            float massB = bodyB->m_fMass <= 0.0f ? 1000000.0f : bodyB->m_fMass;
-
-            // A mozgó testeket a penetráció mélységének arányában kell eltolni
-            //float totalMass = massA + massB;
-
-            //if (totalMass > 0) 
             {
                 // Az eltolás mértéke a penetráció mélysége alapján
-                glm::vec3 correctionA(0.0f), correctionB(0.0f);
+                glm::vec3 correctionB(0.0f);
 
-                /*if (bodyA->m_fMass > 0.0f)
-                {
-                    float ratioA = massB / totalMass;  // A test aránya
-                    correctionA = -normal * penetration * ratioA;
-                    bodyA->m_v3Position += correctionA;
-                }*/
-                
                 if (bodyB->m_fMass > 0.0f)
                 {
-                    //float ratioB = massA / totalMass;  // B test aránya
                     correctionB = normal * penetration/* * ratioB*/;
                     bodyB->m_v3Position += correctionB;
                 }
             }
         }
 
-        void CollisionResponse(struct Hits *pHits) 
+        // ez egy jobb széttolás. tesztelni kell majd
+        /*
+void ResolveCollisionWithPenalization(RigidBody* body, RigidBody* otherBody, glm::vec3 collisionPoint, glm::vec3 normal, float fPenetration)
+{
+    // Rugó állandó (k), amely meghatározza, milyen erős az eltoló erő
+    const float k = 1000.0f; // Ez állítható érték, minél nagyobb, annál erősebb az eltoló erő
+    const float damping = 0.1f; // Csillapítási tényező a túlzott oszcilláció elkerülésére
+
+    // Számítsuk ki a penetrációból származó korrekciós erőt
+    glm::vec3 correctionForce = k * fPenetration * normal;
+
+    // Csillapítás hozzáadása a sebességek függvényében
+    glm::vec3 relativeVelocity = body->m_v3LinearVelocity - otherBody->m_v3LinearVelocity;
+    glm::vec3 dampingForce = damping * glm::dot(relativeVelocity, normal) * normal;
+
+    // Teljes korrekciós erő
+    glm::vec3 totalCorrectionForce = correctionForce - dampingForce;
+
+    // Alkalmazzuk a korrekciós erőt a testekre
+    body->m_v3LinearVelocity += totalCorrectionForce / body->m_fMass;
+    otherBody->m_v3LinearVelocity -= totalCorrectionForce / otherBody->m_fMass;
+
+    // Pozíció frissítése a penetráció minimalizálása érdekében
+    float positionalCorrectionFactor = 0.2f; // Állítható érték a penetráció fokozatos csökkentéséhez
+    glm::vec3 positionalCorrection = positionalCorrectionFactor * fPenetration * normal;
+
+    body->m_v3Position += positionalCorrection / 2.0f;  // Két test egyenlő mértékben mozogjon
+    otherBody->m_v3Position -= positionalCorrection / 2.0f;
+}
+        */
+
+        void CollisionResponse() 
         {
-            Hit* pHit = &(pHits->m_listHits[0]);
-            for (int j = 0; j < (int)pHits->m_listHits.size(); j++) 
+            for (int i = 0; i < (int)m_listHits.size(); i++)
             {
-                if (pHits->m_listHits[j].m_fPenetration > pHit->m_fPenetration)
-                {
-                    pHit = &(pHits->m_listHits[j]);
-                }
-            }
-            ResolvePenetration(*pHit);
+                Hits* pHits = &(m_listHits[i]);
 
-            for (int j = 0; j < (int)pHits->m_listHits.size(); j++) 
-            {
-                Hit *pHit = &(pHits->m_listHits[j]);
-
-                /*if (pHit->m_fPenetration < 0.001f)
+                if (0 == pHits->m_listHits.size()) 
                 {
                     continue;
-                }*/
-
-                // resolve collision
-                if (pHit->m_pRigidBody1->m_fMass > 0.0f && pHit->m_pRigidBody2->m_fMass > 0.0f) 
-                {
-                    ResolveCollisionWithFriction(pHit->m_pRigidBody1, pHit->m_pRigidBody2, pHit->m_v3PointInWorld, -pHit->m_v3NormalInWorld);
-                }
-                else if (pHit->m_pRigidBody1->m_fMass > 0.0f) 
-                {
-                    ResolveCollisionWithFriction(pHit->m_pRigidBody1, pHit->m_v3PointInWorld, -pHit->m_v3NormalInWorld);
-                }
-                else if (pHit->m_pRigidBody2->m_fMass > 0.0f) 
-                {
-                    ResolveCollisionWithFriction(pHit->m_pRigidBody2, pHit->m_v3PointInWorld, pHit->m_v3NormalInWorld);
                 }
 
+                Hit* pHit = &(pHits->m_listHits[0]);
+                for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
+                {
+                    if (pHits->m_listHits[j].m_fPenetration > pHit->m_fPenetration)
+                    {
+                        pHit = &(pHits->m_listHits[j]);
+                    }
+                }
+                //ResolvePenetration(*pHit);
+
+                for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
+                {
+                    Hit* pHit = &(pHits->m_listHits[j]);
+
+                    if (pHit->m_pRigidBody2->m_fMass > 0.0f)
+                    {
+                        ResolveCollisionWithFriction(pHit->m_pRigidBody2, pHit->m_v3PointInWorld, pHit->m_v3NormalInWorld);
+                    }
+
+                }
             }
 
             

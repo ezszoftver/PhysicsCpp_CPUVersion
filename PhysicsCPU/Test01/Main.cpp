@@ -22,7 +22,7 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	int matId = pPhysics->GenMaterial();
 	Physics::Material* pMaterial = pPhysics->GetMaterial(matId);
 	pMaterial->m_fRestitution = 0.0f;
-	pMaterial->m_fFriction = 1.0f;
+	pMaterial->m_fFriction = 0.1f;
 
 	int meshId = pPhysics->GenConvexTriMesh();
 	Physics::ConvexTriMesh* pMesh = pPhysics->GetConvexTriMesh(meshId);
@@ -104,8 +104,8 @@ void CreateCube(glm::vec3 v3Position, glm::quat quatOrientation, glm::vec3 v3Hal
 	pRigidBody->m_nConvexTriMeshId = meshId;
 	pRigidBody->m_nMaterialId = matId;
 
-	pRigidBody->m_fLinearDamping = 0.5f;
-	pRigidBody->m_fAngularDamping = 0.5f;
+	pRigidBody->m_fLinearDamping = 0.1f;
+	pRigidBody->m_fAngularDamping = 0.1f;
 
 	if (fMass > 0.0f) 
 	{
@@ -126,20 +126,20 @@ bool Init()
 {
 	glEnable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	glPointSize(10.0f);
 	glEnable(GL_POINT_SMOOTH);
 	glHint(GL_POINT_SMOOTH_HINT, GL_NICEST);
 
 	// physics
 	pPhysics = new Physics(200);
-	pPhysics->SetGravity(glm::vec3(0.0f, -10.0f, 0.0f));
+	pPhysics->SetGravity(glm::vec3(0.0f, -1.0f, 0.0f));
 
 	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(5, 0.1, 5), 0.0f);
 
-	for (int i = 0; i < 5; i++) 
+	for (int i = 0; i < 1; i++) 
 	{
-		CreateCube(glm::vec3(0, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(1.0f, 0.2f, 0.5f), 10.0f);
+		CreateCube(glm::vec3(i * 0.7f, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(/*1.0f, 0.2f, 0.5f*/0.5f, 0.5f, 0.5f), 10.0f);
 	}
 
 	//CreateCube(glm::vec3(0, 2.0f, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
@@ -212,11 +212,13 @@ void DebugDraw()
 	glPopMatrix();
 
 	// draw hits
-	/*glPushMatrix();
+	glPushMatrix();
 	for (int i = 0; i < pPhysics->NumRigidBodies(); i++) 
 	{
 		struct Physics::RigidBody* pRigidBody = pPhysics->GetRigidBody(i);
 		struct Physics::Hits *pHits = &(pPhysics->m_listHits[pRigidBody->m_nHitId]);
+
+		if (pRigidBody->m_fMass <= 0.0f) { continue; }
 
 		for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
 		{
@@ -232,7 +234,7 @@ void DebugDraw()
 			glEnd();
 
 			glm::vec3 v3A = pHit->m_v3PointInWorld;
-			glm::vec3 v3B = v3A + (pHit->m_v3NormalInWorld * pHit->m_fPenetration);
+			glm::vec3 v3B = v3A + (pHit->m_v3NormalInWorld/* * pHit->m_fPenetration*/);
 
 			glLineWidth(5.0);
 			glBegin(GL_LINES);
@@ -246,7 +248,7 @@ void DebugDraw()
 			glLineWidth(1.0);
 		}
 	}
-	glPopMatrix();*/
+	glPopMatrix();
 }
 
 void Update() 
