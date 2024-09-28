@@ -420,7 +420,7 @@ namespace PhysicsCPU
 
             CollisionDetection();
             CollisionResponse();
-            
+
             UpdateTransforms();
         }
 
@@ -916,16 +916,19 @@ namespace PhysicsCPU
                     Plane* pConvexPlanes2 = &(listRB2Planes[j * 4]);
                     Line* pLines2 = &(listRB2Lines[j * 3]);
 
-                    GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, fPenetration, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2, pHits);
-
-                    /*struct Hits hits2;
-                    GenerateHits(pRigidBody2, pRigidBody1, v3RB2Dir, fPenetration, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1, &hits2);
+                    struct Hits hits2;
+                    GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, fPenetration, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2, &hits2);
+                    GenerateHits(pRigidBody2, pRigidBody1, v3RB1Dir, fPenetration, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1, &hits2);
 
                     for (int j = 0; j < (int)hits2.m_listHits.size(); j++)
                     {
                         struct Hit hit2 = hits2.m_listHits[j];
-                        pHits->m_listHits.push_back( hit2.Invert());
-                    }*/
+
+                        {
+                            pHits->m_listHits.push_back(hit2);
+                        }
+                                                
+                    }
 
                 }
             }
@@ -1103,7 +1106,7 @@ void ResolveCollisionWithPenalization(RigidBody* body, RigidBody* otherBody, glm
                         pHit = &(pHits->m_listHits[j]);
                     }
                 }
-                //ResolvePenetration(*pHit);
+                ResolvePenetration(*pHit);
 
                 for (int j = 0; j < (int)pHits->m_listHits.size(); j++)
                 {

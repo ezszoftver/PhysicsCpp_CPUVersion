@@ -137,7 +137,7 @@ bool Init()
 
 	CreateCube(glm::vec3(0, -1, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(5, 0.1, 5), 0.0f);
 
-	for (int i = 0; i < 1; i++) 
+	for (int i = 0; i < 5; i++) 
 	{
 		CreateCube(glm::vec3(i * 0.7f, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(/*1.0f, 0.2f, 0.5f*/0.5f, 0.5f, 0.5f), 10.0f);
 	}
@@ -234,7 +234,7 @@ void DebugDraw()
 			glEnd();
 
 			glm::vec3 v3A = pHit->m_v3PointInWorld;
-			glm::vec3 v3B = v3A + (pHit->m_v3NormalInWorld/* * pHit->m_fPenetration*/);
+			glm::vec3 v3B = v3A - (pHit->m_v3NormalInWorld/* * pHit->m_fPenetration*/);
 
 			glLineWidth(5.0);
 			glBegin(GL_LINES);
