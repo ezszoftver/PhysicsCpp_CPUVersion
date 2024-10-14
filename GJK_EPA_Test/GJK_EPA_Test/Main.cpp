@@ -1,8 +1,14 @@
-﻿#include <glm/glm.hpp>
-#include <vector>
+﻿#include <vector>
 #include <limits>
 #include <iostream>
 #include <cmath>
+
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
+
+#define MAX_ITERATIONS 64
 
 struct CollisionPoints 
 {
@@ -31,8 +37,10 @@ public:
         m_size = 0;
         m_points.clear();
 
-        for (glm::vec3 point : list) {
-            if (m_size < 4) { // Limiting to 4 points
+        for (glm::vec3 point : list) 
+        {
+            if (m_size < 4) // Limiting to 4 points
+            { 
                 m_points.push_back(point);
                 m_size++;
             }
@@ -78,10 +86,13 @@ glm::vec3 FindFurthestPoint(const std::vector<glm::vec3>& m_vertices, glm::vec3 
 }
 
 // Minkowski-differencia támogatási függvénye
-glm::vec3 Support(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, const glm::vec3& direction, glm::vec3* pointA, glm::vec3* pointB)
+glm::vec3 Support(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, glm::mat4 transformA, glm::mat4 transformB, const glm::vec3& direction, glm::vec3* pointA, glm::vec3* pointB)
 {
     glm::vec3 furthestA = FindFurthestPoint(colliderA, direction);
     glm::vec3 furthestB = FindFurthestPoint(colliderB, -direction);
+
+    furthestA = transformA * glm::vec4(furthestA, 1.0f);
+    furthestB = transformB * glm::vec4(furthestB, 1.0f);
 
     if (pointA) *pointA = furthestA;
     if (pointB) *pointB = furthestB;
@@ -102,11 +113,13 @@ bool Line(Simplex& points, glm::vec3& direction)
     glm::vec3 ab = b - a;
     glm::vec3 ao = -a;
 
-    if (SameDirection(ab, ao)) {
+    if (SameDirection(ab, ao)) 
+    {
         direction = glm::cross(glm::cross(ab, ao), ab);
     }
 
-    else {
+    else 
+    {
         points = { a };
         direction = ao;
     }
@@ -126,28 +139,34 @@ bool Triangle(Simplex& points, glm::vec3& direction)
 
     glm::vec3 abc = glm::cross(ab, ac);
 
-    if (SameDirection(glm::cross(abc, ac), ao)) {
-        if (SameDirection(ac, ao)) {
+    if (SameDirection(glm::cross(abc, ac), ao)) 
+    {
+        if (SameDirection(ac, ao)) 
+        {
             points = { a, c };
             direction = glm::cross(glm::cross(ac, ao), ac);
         }
 
-        else {
+        else 
+        {
             return Line(points = { a, b }, direction);
         }
     }
 
     else {
-        if (SameDirection(glm::cross(ab, abc), ao)) {
+        if (SameDirection(glm::cross(ab, abc), ao)) 
+        {
             return Line(points = { a, b }, direction);
         }
 
         else {
-            if (SameDirection(abc, ao)) {
+            if (SameDirection(abc, ao)) 
+            {
                 direction = abc;
             }
 
-            else {
+            else 
+            {
                 points = { a, c, b };
                 direction = -abc;
             }
@@ -173,15 +192,18 @@ bool Tetrahedron(Simplex& points, glm::vec3& direction)
     glm::vec3 acd = glm::cross(ac, ad);
     glm::vec3 adb = glm::cross(ad, ab);
 
-    if (SameDirection(abc, ao)) {
+    if (SameDirection(abc, ao)) 
+    {
         return Triangle(points = { a, b, c }, direction);
     }
 
-    if (SameDirection(acd, ao)) {
+    if (SameDirection(acd, ao)) 
+    {
         return Triangle(points = { a, c, d }, direction);
     }
 
-    if (SameDirection(adb, ao)) {
+    if (SameDirection(adb, ao)) 
+    {
         return Triangle(points = { a, d, b }, direction);
     }
 
@@ -190,42 +212,49 @@ bool Tetrahedron(Simplex& points, glm::vec3& direction)
 
 bool NextSimplex(Simplex& points, glm::vec3& direction)
 {
-    switch (points.size()) {
-    case 2: return Line(points, direction);
-    case 3: return Triangle(points, direction);
-    case 4: return Tetrahedron(points, direction);
+    switch (points.size()) 
+    {
+        case 2: return Line(points, direction);
+        case 3: return Triangle(points, direction);
+        case 4: return Tetrahedron(points, direction);
     }
 
     // never should be here
     return false;
 }
 
-bool GJK(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, Simplex& points)
+bool GJK(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, glm::mat4 transformA, glm::mat4 transformB, Simplex& points)
 {
+    glm::vec3 direction = glm::sphericalRand(1.0f);
+
     glm::vec3 pointA, pointB; // A két test legközelebbi pontjai
-    glm::vec3 support = Support(colliderA, colliderB, glm::vec3(1, 1, 0), &pointA, &pointB);
+    glm::vec3 support = Support(colliderA, colliderB, transformA, transformB, direction, &pointA, &pointB);
 
     // Simplex is an array of points, max count is 4
     points.push_front(support);
 
     // New direction is towards the origin
-    glm::vec3 direction = -support;
+    direction = -support;
 
-    int iterations = 0;
-    while (iterations < 64) 
+    for (int iterations = 0; iterations < MAX_ITERATIONS; iterations++)
     {
-        iterations++;
+        support = Support(colliderA, colliderB, transformA, transformB, direction, &pointA, &pointB);
 
-        support = Support(colliderA, colliderB, direction, &pointA, &pointB);
-
-        if (dot(support, direction) <= 0) {
+        /*if (dot(support, direction) <= 0) 
+        {
             return false; // no collision
-        }
+        }*/
 
         points.push_front(support);
 
-        if (NextSimplex(points, direction)) {
+        if (NextSimplex(points, direction)) 
+        {
             return true;
+        }
+
+        if (direction.length() < 0.001f)
+        {
+            direction = glm::sphericalRand(1.0f);
         }
     }
 
@@ -241,7 +270,8 @@ void GetFaceNormals(
 {
     float  minDistance = FLT_MAX;
 
-    for (size_t i = 0; i < faces.size(); i += 3) {
+    for (size_t i = 0; i < faces.size(); i += 3) 
+    {
         glm::vec3 a = polytope[faces[i]];
         glm::vec3 b = polytope[faces[i + 1]];
         glm::vec3 c = polytope[faces[i + 2]];
@@ -249,14 +279,16 @@ void GetFaceNormals(
         glm::vec3 normal = glm::normalize(glm::cross(b - a, c - a));
         float distance = dot(normal, a);
 
-        if (distance < 0) {
+        if (distance < 0) 
+        {
             normal *= -1;
             distance *= -1;
         }
 
         (*normals).emplace_back(normal, distance);
 
-        if (distance < minDistance) {
+        if (distance < minDistance) 
+        {
             (*minTriangle) = i / 3;
             minDistance = distance;
         }
@@ -275,11 +307,13 @@ void AddIfUniqueEdge(
         std::make_pair(faces[b], faces[a]) //   1-->--2
     );
 
-    if (reverse != edges.end()) {
+    if (reverse != edges.end()) 
+    {
         edges.erase(reverse);
     }
 
-    else {
+    else 
+    {
         edges.emplace_back(faces[a], faces[b]);
     }
 }
@@ -287,10 +321,12 @@ void AddIfUniqueEdge(
 CollisionPoints EPA(
     const std::vector<glm::vec3>& colliderA,
     const std::vector<glm::vec3>& colliderB,
+    glm::mat4 transformA, glm::mat4 transformB,
     const Simplex& simplex)
 {
     std::vector<glm::vec3> polytope(simplex.begin(), simplex.end());
-    std::vector<size_t> faces = {
+    std::vector<size_t> faces = 
+    {
         0, 1, 2,
         0, 3, 1,
         0, 2, 3,
@@ -304,24 +340,31 @@ CollisionPoints EPA(
     glm::vec3 minNormal;
     float minDistance = FLT_MAX;
 
-    int iterations = 0;
     glm::vec3 pointA, pointB; // A két test legközelebbi pontjai
 
-    while (minDistance == FLT_MAX && iterations < 64)
+    CollisionPoints points;
+    points.HasCollision = false;
+
+    for (int iterations = 0; /*minDistance == FLT_MAX &&*/false == points.HasCollision && iterations < MAX_ITERATIONS; iterations++)
     {
         minNormal = glm::vec3(normals[minFace]);
         minDistance = normals[minFace].w;
 
-        glm::vec3 support = Support(colliderA, colliderB, minNormal, &pointA, &pointB);
+        glm::vec3 support = Support(colliderA, colliderB, transformA, transformB, minNormal, &pointA, &pointB);
         float sDistance = glm::dot(minNormal, support);
 
-        if (abs(sDistance - minDistance) > 0.001f) {
-            minDistance = FLT_MAX;
+        points.HasCollision = true;
+        if (abs(sDistance - minDistance) > 0.0001f) 
+        {
+            //minDistance = FLT_MAX;
+            points.HasCollision = false;
 
             std::vector<std::pair<size_t, size_t>> uniqueEdges;
 
-            for (size_t i = 0; i < normals.size(); i++) {
-                if (SameDirection(normals[i], support)) {
+            for (size_t i = 0; i < normals.size(); i++) 
+            {
+                if (SameDirection(normals[i], support)) 
+                {
                     size_t f = i * 3;
 
                     AddIfUniqueEdge(uniqueEdges, faces, f, f + 1);
@@ -340,7 +383,8 @@ CollisionPoints EPA(
             }
 
             std::vector<size_t> newFaces;
-            for (const auto& edge : uniqueEdges) {
+            for (const auto& edge : uniqueEdges) 
+            {
                 size_t edgeIndex1 = edge.first;
                 size_t edgeIndex2 = edge.second;
 
@@ -356,14 +400,17 @@ CollisionPoints EPA(
             GetFaceNormals(polytope, newFaces, &newNormals, &newMinFace);
 
             float oldMinDistance = FLT_MAX;
-            for (size_t i = 0; i < normals.size(); i++) {
-                if (normals[i].w < oldMinDistance) {
+            for (size_t i = 0; i < normals.size(); i++) 
+            {
+                if (normals[i].w < oldMinDistance) 
+                {
                     oldMinDistance = normals[i].w;
                     minFace = i;
                 }
             }
 
-            if (newNormals[newMinFace].w < oldMinDistance) {
+            if (newNormals[newMinFace].w < oldMinDistance) 
+            {
                 minFace = newMinFace + normals.size();
             }
 
@@ -372,20 +419,11 @@ CollisionPoints EPA(
         }
     }
 
-    CollisionPoints points;
-
-    if (minDistance == FLT_MAX)
-    {
-        points.HasCollision = false;
-    }
-    else
+    if (true == points.HasCollision)
     {
         points.Normal = minNormal;
         points.PenetrationDepth = minDistance;
-        points.HasCollision = true;
-
-        // Világkoordinátás ütközési pont kiszámítása
-        points.collisionPoint = (pointA + pointB) / 2.0f;
+        points.collisionPoint = (pointA + pointB) * 0.5f;
     }
 
     return points;
@@ -393,31 +431,42 @@ CollisionPoints EPA(
 
 int main() {
     glm::vec3 position1 = glm::vec3(100, 100, 100);
-    std::vector<glm::vec3> shape1 = {
-        position1 + glm::vec3(-1, -1, -1), position1 + glm::vec3(1, -1, -1), position1 + glm::vec3(1, 1, -1), position1 + glm::vec3(-1, 1, -1), // Alsó négyzet
-        position1 + glm::vec3(-1, -1, 1), position1 + glm::vec3(1, -1, 1), position1 + glm::vec3(1, 1, 1), position1 + glm::vec3(-1, 1, 1)      // Felső négyzet
+    glm::mat4 transform1 = glm::translate(glm::mat4(1.0f), position1);
+    std::vector<glm::vec3> shape1 = 
+    {
+        glm::vec3(-1, -1, -1), glm::vec3(1, -1, -1), glm::vec3(1, 1, -1), glm::vec3(-1, 1, -1), // Alsó négyzet
+        glm::vec3(-1, -1, 1), glm::vec3(1, -1, 1), glm::vec3(1, 1, 1), glm::vec3(-1, 1, 1)      // Felső négyzet
     };
 
     // Shape2: Egy másik 3D-s kocka, kicsit eltolva az origóhoz képest, hogy érintkezzen az elsővel
-    glm::vec3 position2 = glm::vec3(100.0f, 101, 100);
-    std::vector<glm::vec3> shape2 = {
-        position2 + glm::vec3(-1, -1, -1), position2 + glm::vec3(1, -1, -1), position2 + glm::vec3(1, 1, -1), position2 + glm::vec3(-1, 1, -1), // Alsó négyzet
-        position2 + glm::vec3(-1, -1, 1), position2 + glm::vec3(1, -1, 1), position2 + glm::vec3(1, 1, 1), position2 + glm::vec3(-1, 1, 1)      // Felső négyzet
+    glm::vec3 position2 = glm::vec3(102, 102, 100);
+    glm::mat4 transform2 = glm::translate(glm::mat4(1.0f), position2);
+    std::vector<glm::vec3> shape2 = 
+    {
+        glm::vec3(-1, -1, -1), glm::vec3(1, -1, -1), glm::vec3(1, 1, -1), glm::vec3(-1, 1, -1), // Alsó négyzet
+        glm::vec3(-1, -1, 1), glm::vec3(1, -1, 1), glm::vec3(1, 1, 1), glm::vec3(-1, 1, 1)      // Felső négyzet
     };
 
     Simplex simplex;
-    if (true == GJK(shape1, shape2, simplex)) 
+    if (true == GJK(shape1, shape2, transform1, transform2, simplex))
     {
-        CollisionPoints points = EPA(shape1, shape2, simplex);
+        CollisionPoints points = EPA(shape1, shape2, transform1, transform2, simplex);
 
-        printf("Collision detected\n");
-        printf(" -> Collision Point: %.2f %.2f %.2f\n", points.collisionPoint.x, points.collisionPoint.y, points.collisionPoint.z);
-        printf(" -> Collision Normal: %.2f %.2f %.2f\n", points.Normal.x, points.Normal.y, points.Normal.z);
-        printf(" -> Penetration Depth: %.2f", points.PenetrationDepth);
+        if (true == points.HasCollision) 
+        {
+            printf("Collision detected\n");
+            printf(" -> Collision Point: %.2f %.2f %.2f\n", points.collisionPoint.x, points.collisionPoint.y, points.collisionPoint.z);
+            printf(" -> Collision Normal: %.2f %.2f %.2f\n", points.Normal.x, points.Normal.y, points.Normal.z);
+            printf(" -> Penetration Depth: %.2f", points.PenetrationDepth);
+        }
+        else
+        {
+            printf("No collision (epa)");
+        }
     }
-    else 
+    else
     {
-        printf("No collision");
+        printf("No collision (gjk)");
     }
 
     return 0;
