@@ -14,37 +14,13 @@
 #include "Plane.h"
 #include "Line.h"
 
+#define MAX_ITERATIONS 64
+
 namespace PhysicsCPU 
 {
 	class Physics
 	{
 	private:
-        static bool IsParallel(glm::vec3 v3Dir1, glm::vec3 v3Dir2)
-        {
-            float fAngleRad = glm::angle(v3Dir1, v3Dir2);
-            float fAngle = glm::degrees(fAngleRad);
-            return ((std::fabs(fAngle) < 0.1f) || (std::fabs(fAngle) > 179.9f));
-        }
-
-        static bool IntersectPlaneLine(Plane* pPlane, Line* pLine, glm::vec3 *pRet)
-        {
-            float denom = glm::dot(pPlane->m_v3Normal, pLine->GetDir());
-
-            if (glm::abs(denom) > 0.001f) 
-            {
-                float t = glm::dot(pPlane->m_v3Pos - pLine->m_v3A, pPlane->m_v3Normal) / denom;
-
-                if (t < 0.0f) { return false; }
-                glm::vec3 v3IntersectPoint = pLine->m_v3A + (t * pLine->GetDir());
-                float t_max = glm::distance(pLine->m_v3A, pLine->m_v3B);
-                if (t > t_max) { return false; }
-
-                (*pRet) = v3IntersectPoint;
-                return true;
-            }
-
-            return false;
-        }
 
         struct Common
         {
@@ -154,8 +130,6 @@ namespace PhysicsCPU
             std::vector<Triangle> m_listTriangles;
 
             std::vector<glm::vec3> m_listUniqueVertices;
-            std::vector<glm::vec3> m_listUniqueNormals;
-            std::vector<glm::vec3> m_listUniqueEdges;
 
             glm::vec3 m_v3LocalMin = glm::vec3(0, 0, 0);
             glm::vec3 m_v3LocalMax = glm::vec3(0, 0, 0);
@@ -167,20 +141,6 @@ namespace PhysicsCPU
                     glm::vec3 v3Point2 = (*pList)[i];
 
                     if (v3Point == v3Point2) 
-                    {
-                        return true;
-                    }
-                }
-
-                return false;
-            }
-
-            bool IsContainsDir(std::vector<glm::vec3> *pList, glm::vec3 v3Dir)
-            {
-                for (int i = 0; i < (int)(*pList).size(); i++)
-                {
-                    glm::vec3 v3Dir2 = (*pList)[i];
-                    if (true == Physics::IsParallel(v3Dir, v3Dir2)) 
                     {
                         return true;
                     }
@@ -235,48 +195,13 @@ namespace PhysicsCPU
                 }
 
                 m_listUniqueVertices.clear();
-                m_listUniqueNormals.clear();
-                m_listUniqueEdges.clear();
                 for (int i = 0; i < (int)m_listVertices.size(); i++) 
                 {
                     glm::vec3 v3Point = m_listVertices[i];
 
                     if (false == IsContainsPoint(&m_listUniqueVertices, v3Point)) 
                     { 
-                        m_listUniqueVertices.push_back(v3Point); 
-                    }
-                }
-                for (int i = 0; i < (int)m_listTriangles.size(); i++)
-                {
-                    Triangle* pTri = &(m_listTriangles[i]);
-
-                    if (false == IsContainsDir(&m_listUniqueNormals, pTri->m_v3Normal)) 
-                    { 
-                        m_listUniqueNormals.push_back(pTri->m_v3Normal); 
-                    }
-                }
-                for (int i = 0; i < (int)m_listTriangles.size(); i++)
-                {
-                    Triangle* pTri = &(m_listTriangles[i]);
-
-                    glm::vec3 v3A = m_listVertices[pTri->m_nAId];
-                    glm::vec3 v3B = m_listVertices[pTri->m_nBId];
-                    glm::vec3 v3C = m_listVertices[pTri->m_nCId];
-
-                    Line line1(v3A, v3B);
-                    Line line2(v3B, v3C);
-                    Line line3(v3C, v3A);
-                    if (false == IsContainsDir(&m_listUniqueEdges, line1.GetDir())) 
-                    { 
-                        m_listUniqueEdges.push_back(line1.GetDir()); 
-                    }
-                    if (false == IsContainsDir(&m_listUniqueEdges, line2.GetDir())) 
-                    { 
-                        m_listUniqueEdges.push_back(line2.GetDir()); 
-                    }
-                    if (false == IsContainsDir(&m_listUniqueEdges, line3.GetDir())) 
-                    { 
-                        m_listUniqueEdges.push_back(line3.GetDir()); 
+                        m_listUniqueVertices.push_back(v3Point);
                     }
                 }
 
@@ -411,6 +336,441 @@ namespace PhysicsCPU
         }
 
     private:
+
+        struct Simplex
+        {
+        private:
+            std::vector<glm::vec3> m_points;
+            int m_size;
+
+        public:
+            Simplex()
+                : m_size(0)
+            {
+                // Reserve space for 4 points (if necessary for performance)
+                m_points.reserve(4);
+            }
+
+            Simplex& operator=(std::initializer_list<glm::vec3> list)
+            {
+                m_size = 0;
+                m_points.clear();
+
+                for (glm::vec3 point : list)
+                {
+                    if (m_size < 4) // Limiting to 4 points
+                    {
+                        m_points.push_back(point);
+                        m_size++;
+                    }
+                }
+
+                return *this;
+            }
+
+            void clear()
+            {
+                m_size = 0;
+            }
+
+            void push_front(glm::vec3 point)
+            {
+                if (m_size < 4) {
+                    m_points.insert(m_points.begin(), point);
+                    m_size++;
+                }
+                else {
+                    m_points = { point, m_points[0], m_points[1], m_points[2] };
+                }
+            }
+
+            glm::vec3& operator[](int i) { return m_points[i]; }
+            size_t size() const { return m_size; }
+
+            auto begin() const { return m_points.begin(); }
+            auto end() const { return m_points.begin() + m_size; }  // Adjusted to handle dynamic size
+        };
+
+        glm::vec3 FindFurthestPoint(const std::vector<glm::vec3>& m_vertices, glm::vec3 direction)
+        {
+            glm::vec3 maxPoint;
+            float maxDistance = -FLT_MAX;
+
+            for (glm::vec3 vertex : m_vertices)
+            {
+                float distance = glm::dot(vertex, direction);
+                if (distance > maxDistance)
+                {
+                    maxDistance = distance;
+                    maxPoint = vertex;
+                }
+            }
+
+            return maxPoint;
+        }
+
+        // Minkowski-differencia támogatási függvénye
+        glm::vec3 Support(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, glm::mat4 transformA, glm::mat4 transformB, const glm::vec3& direction, glm::vec3* pointA, glm::vec3* pointB)
+        {
+            glm::vec3 furthestA = FindFurthestPoint(colliderA, direction);
+            glm::vec3 furthestB = FindFurthestPoint(colliderB, -direction);
+
+            furthestA = transformA * glm::vec4(furthestA, 1.0f);
+            furthestB = transformB * glm::vec4(furthestB, 1.0f);
+
+            if (pointA) *pointA = furthestA;
+            if (pointB) *pointB = furthestB;
+
+            return furthestA - furthestB; // Minkowski-differencia pontja
+        }
+
+        bool SameDirection(const glm::vec3& direction, const glm::vec3& ao)
+        {
+            return glm::dot(direction, ao) > 0;
+        }
+
+        bool LineCase(Simplex& points, glm::vec3& direction)
+        {
+            glm::vec3 a = points[0];
+            glm::vec3 b = points[1];
+
+            glm::vec3 ab = b - a;
+            glm::vec3 ao = -a;
+
+            if (SameDirection(ab, ao))
+            {
+                direction = glm::cross(glm::cross(ab, ao), ab);
+            }
+
+            else
+            {
+                points = { a };
+                direction = ao;
+            }
+
+            return false;
+        }
+
+        bool TriangleCase(Simplex& points, glm::vec3& direction)
+        {
+            glm::vec3 a = points[0];
+            glm::vec3 b = points[1];
+            glm::vec3 c = points[2];
+
+            glm::vec3 ab = b - a;
+            glm::vec3 ac = c - a;
+            glm::vec3 ao = -a;
+
+            glm::vec3 abc = glm::cross(ab, ac);
+
+            if (SameDirection(glm::cross(abc, ac), ao))
+            {
+                if (SameDirection(ac, ao))
+                {
+                    points = { a, c };
+                    direction = glm::cross(glm::cross(ac, ao), ac);
+                }
+
+                else
+                {
+                    return LineCase(points = { a, b }, direction);
+                }
+            }
+
+            else {
+                if (SameDirection(glm::cross(ab, abc), ao))
+                {
+                    return LineCase(points = { a, b }, direction);
+                }
+
+                else {
+                    if (SameDirection(abc, ao))
+                    {
+                        direction = abc;
+                    }
+
+                    else
+                    {
+                        points = { a, c, b };
+                        direction = -abc;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        bool TetrahedronCase(Simplex& points, glm::vec3& direction)
+        {
+            glm::vec3 a = points[0];
+            glm::vec3 b = points[1];
+            glm::vec3 c = points[2];
+            glm::vec3 d = points[3];
+
+            glm::vec3 ab = b - a;
+            glm::vec3 ac = c - a;
+            glm::vec3 ad = d - a;
+            glm::vec3 ao = -a;
+
+            glm::vec3 abc = glm::cross(ab, ac);
+            glm::vec3 acd = glm::cross(ac, ad);
+            glm::vec3 adb = glm::cross(ad, ab);
+
+            if (SameDirection(abc, ao))
+            {
+                return TriangleCase(points = { a, b, c }, direction);
+            }
+
+            if (SameDirection(acd, ao))
+            {
+                return TriangleCase(points = { a, c, d }, direction);
+            }
+
+            if (SameDirection(adb, ao))
+            {
+                return TriangleCase(points = { a, d, b }, direction);
+            }
+
+            return true;
+        }
+
+        bool NextSimplex(Simplex& points, glm::vec3& direction)
+        {
+            switch (points.size())
+            {
+            case 2: return LineCase(points, direction);
+            case 3: return TriangleCase(points, direction);
+            case 4: return TetrahedronCase(points, direction);
+            }
+
+            // never should be here
+            return false;
+        }
+
+        bool GJK(/*const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, glm::mat4 transformA, glm::mat4 transformB,*/RigidBody* pRigidBody1, RigidBody* pRigidBody2, Simplex& points)
+        {
+            const std::vector<glm::vec3>& colliderA = m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId].m_listUniqueVertices;
+            const std::vector<glm::vec3>& colliderB = m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId].m_listUniqueVertices;
+            const glm::mat4 transformA = pRigidBody1->m_matWorld;
+            const glm::mat4 transformB = pRigidBody2->m_matWorld;
+
+            glm::vec3 direction = glm::sphericalRand(1.0f);
+
+            glm::vec3 pointA, pointB; // A két test legközelebbi pontjai
+            glm::vec3 support = Support(colliderA, colliderB, transformA, transformB, direction, &pointA, &pointB);
+
+            // Simplex is an array of points, max count is 4
+            points.push_front(support);
+
+            // New direction is towards the origin
+            direction = -support;
+
+            for (int iterations = 0; iterations < MAX_ITERATIONS; iterations++)
+            {
+                support = Support(colliderA, colliderB, transformA, transformB, direction, &pointA, &pointB);
+
+                /*if (dot(support, direction) <= 0)
+                {
+                    return false; // no collision
+                }*/
+
+                points.push_front(support);
+
+                if (NextSimplex(points, direction))
+                {
+                    return true;
+                }
+
+                if (direction.length() < 0.001f)
+                {
+                    direction = glm::sphericalRand(1.0f);
+                }
+            }
+
+            return false;
+        }
+
+        void GetFaceNormals(
+            const std::vector<glm::vec3>& polytope,
+            const std::vector<size_t>& faces,
+
+            std::vector<glm::vec4>* normals,
+            size_t* minTriangle)
+        {
+            float  minDistance = FLT_MAX;
+
+            for (size_t i = 0; i < faces.size(); i += 3)
+            {
+                glm::vec3 a = polytope[faces[i]];
+                glm::vec3 b = polytope[faces[i + 1]];
+                glm::vec3 c = polytope[faces[i + 2]];
+
+                glm::vec3 normal = glm::normalize(glm::cross(b - a, c - a));
+                float distance = dot(normal, a);
+
+                if (distance < 0)
+                {
+                    normal *= -1;
+                    distance *= -1;
+                }
+
+                (*normals).emplace_back(normal, distance);
+
+                if (distance < minDistance)
+                {
+                    (*minTriangle) = i / 3;
+                    minDistance = distance;
+                }
+            }
+        }
+
+        void AddIfUniqueEdge(
+            std::vector<std::pair<size_t, size_t>>& edges,
+            const std::vector<size_t>& faces,
+            size_t a,
+            size_t b)
+        {
+            auto reverse = std::find(                       //      0--<--3
+                edges.begin(),                              //     / \ B /   A: 2-0
+                edges.end(),                                //    / A \ /    B: 0-2
+                std::make_pair(faces[b], faces[a]) //   1-->--2
+            );
+
+            if (reverse != edges.end())
+            {
+                edges.erase(reverse);
+            }
+
+            else
+            {
+                edges.emplace_back(faces[a], faces[b]);
+            }
+        }
+
+        bool EPA(
+            /*const std::vector<glm::vec3>& colliderA,
+            const std::vector<glm::vec3>& colliderB,
+            glm::mat4 transformA, glm::mat4 transformB,*/
+            RigidBody* pRigidBody1, RigidBody* pRigidBody2,
+            const Simplex& simplex,
+            Hit *pHit)
+        {
+            std::vector<glm::vec3>& colliderA = m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId].m_listUniqueVertices;
+            std::vector<glm::vec3>& colliderB = m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId].m_listUniqueVertices;
+            glm::mat4 transformA = pRigidBody1->m_matWorld;
+            glm::mat4 transformB = pRigidBody2->m_matWorld;
+
+            std::vector<glm::vec3> polytope(simplex.begin(), simplex.end());
+            std::vector<size_t> faces =
+            {
+                0, 1, 2,
+                0, 3, 1,
+                0, 2, 3,
+                1, 3, 2
+            };
+
+            std::vector<glm::vec4> normals;
+            size_t minFace;
+            GetFaceNormals(polytope, faces, &normals, &minFace);
+
+            glm::vec3 minNormal;
+            float minDistance = FLT_MAX;
+
+            glm::vec3 pointA, pointB; // A két test legközelebbi pontjai
+
+            bool bHasCollision = false;
+
+            for (int iterations = 0; /*minDistance == FLT_MAX &&*/false == bHasCollision && iterations < MAX_ITERATIONS; iterations++)
+            {
+                minNormal = glm::vec3(normals[minFace]);
+                minDistance = normals[minFace].w;
+
+                glm::vec3 support = Support(colliderA, colliderB, transformA, transformB, minNormal, &pointA, &pointB);
+                float sDistance = glm::dot(minNormal, support);
+
+                bHasCollision = true;
+                if (abs(sDistance - minDistance) > 0.0001f)
+                {
+                    //minDistance = FLT_MAX;
+                    bHasCollision = false;
+
+                    std::vector<std::pair<size_t, size_t>> uniqueEdges;
+
+                    for (size_t i = 0; i < normals.size(); i++)
+                    {
+                        if (SameDirection(normals[i], support))
+                        {
+                            size_t f = i * 3;
+
+                            AddIfUniqueEdge(uniqueEdges, faces, f, f + 1);
+                            AddIfUniqueEdge(uniqueEdges, faces, f + 1, f + 2);
+                            AddIfUniqueEdge(uniqueEdges, faces, f + 2, f);
+
+                            faces[f + 2] = faces.back(); faces.pop_back();
+                            faces[f + 1] = faces.back(); faces.pop_back();
+                            faces[f] = faces.back(); faces.pop_back();
+
+                            normals[i] = normals.back(); // pop-erase
+                            normals.pop_back();
+
+                            i--;
+                        }
+                    }
+
+                    std::vector<size_t> newFaces;
+                    for (const auto& edge : uniqueEdges)
+                    {
+                        size_t edgeIndex1 = edge.first;
+                        size_t edgeIndex2 = edge.second;
+
+                        newFaces.push_back(edgeIndex1);
+                        newFaces.push_back(edgeIndex2);
+                        newFaces.push_back(polytope.size());
+                    }
+
+                    polytope.push_back(support);
+
+                    std::vector<glm::vec4> newNormals;
+                    size_t newMinFace;
+                    GetFaceNormals(polytope, newFaces, &newNormals, &newMinFace);
+
+                    float oldMinDistance = FLT_MAX;
+                    for (size_t i = 0; i < normals.size(); i++)
+                    {
+                        if (normals[i].w < oldMinDistance)
+                        {
+                            oldMinDistance = normals[i].w;
+                            minFace = i;
+                        }
+                    }
+
+                    if (newNormals[newMinFace].w < oldMinDistance)
+                    {
+                        minFace = newMinFace + normals.size();
+                    }
+
+                    faces.insert(faces.end(), newFaces.begin(), newFaces.end());
+                    normals.insert(normals.end(), newNormals.begin(), newNormals.end());
+                }
+            }
+
+            if (true == bHasCollision)
+            {
+                pHit->m_v3NormalInWorld = glm::normalize(minNormal);
+                pHit->m_fPenetration = std::fabsf(minDistance);
+                pHit->m_v3PointInWorld = pointA;//(pointA + pointB) * 0.5f;
+                pHit->m_pRigidBody2 = pRigidBody2;
+
+                //points.Normal = minNormal;
+                //points.PenetrationDepth = minDistance;
+                //points.collisionPoint = (pointA + pointB) * 0.5f;
+                return true;
+            }
+
+            return false;
+        }
+
+
         void FixedUpdate() 
         {
             Integrate();
@@ -511,348 +871,6 @@ namespace PhysicsCPU
         {
         }
 
-        void GetMinMax(RigidBody *pRigidBody, Plane *pPlane, float *p_fMin, float *p_fMax)
-        {
-            *p_fMin = +FLT_MAX;
-            *p_fMax = -FLT_MAX;
-
-            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
-
-            for (int i = 0; i < (int)pConvexTriMesh->m_listUniqueVertices.size(); i++) 
-            {
-                glm::vec3 v3LocalPos = pConvexTriMesh->m_listUniqueVertices[i];
-                glm::vec3 v3Pos = pRigidBody->m_matWorld * glm::vec4(v3LocalPos, 1.0f);
-
-                float t = pPlane->GetDistance(v3Pos);
-
-                if (t < (*p_fMin)) { (*p_fMin) = t; }
-                if (t > (*p_fMax)) { (*p_fMax) = t; }
-            }
-        }
-
-        glm::vec4 SAT(RigidBody* pRigidBody1, RigidBody* pRigidBody2) 
-        {
-            struct ConvexTriMesh* pConvexTriMesh1 = &(m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId]);
-            struct ConvexTriMesh* pConvexTriMesh2 = &(m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId]);
-
-            glm::vec4 ret(0, 0, 0, 0);
-            float fMinPenetration = FLT_MAX;
-
-            // 1/3 plane-point
-            for (int i = 0; i < (int)pConvexTriMesh1->m_listUniqueNormals.size(); i++)
-            {
-                glm::vec3 v3LocalPos = pRigidBody1->m_v3Position;
-                glm::vec3 v3LocalNormal = pConvexTriMesh1->m_listUniqueNormals[i];
-                glm::vec3 v3Pos = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalPos, 1.0f));
-                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
-
-                Plane plane(v3Pos, v3Normal);
-
-                float fMin1, fMax1;
-                GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
-                float fMin2, fMax2;
-                GetMinMax(pRigidBody2, &plane, &fMin2, &fMax2);
-
-                float fGlobalMin = (fMin1 < fMin2) ? fMin1 : fMin2;
-                float fGlobalMax = (fMax1 > fMax2) ? fMax1 : fMax2;
-                float fGlobalDistance = fGlobalMax - fGlobalMin;
-                float fDist1 = fMax1 - fMin1;
-                float fDist2 = fMax2 - fMin2;
-
-                if (fGlobalDistance > (fDist1 + fDist2)) 
-                {
-                    return glm::vec4(0, 0, 0, 0);
-                }
-
-                float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
-                if (fPenetration < fMinPenetration)
-                {
-                    fMinPenetration = fPenetration;
-                    ret = glm::vec4(plane.m_v3Normal, fMinPenetration);
-                }
-
-            }
-
-            // 2/3 plane-point
-            for (int i = 0; i < (int)pConvexTriMesh2->m_listUniqueNormals.size(); i++)
-            {
-                glm::vec3 v3LocalPos = pRigidBody2->m_v3Position;
-                glm::vec3 v3LocalNormal = pConvexTriMesh2->m_listUniqueNormals[i];
-                glm::vec3 v3Pos = glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalPos, 1.0f));
-                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
-
-                Plane plane(v3LocalPos, v3Normal);
-
-                float fMin1, fMax1;
-                GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
-                float fMin2, fMax2;
-                GetMinMax(pRigidBody2, &plane, &fMin2, &fMax2);
-
-                float fGlobalMin = (fMin1 < fMin2) ? fMin1 : fMin2;
-                float fGlobalMax = (fMax1 > fMax2) ? fMax1 : fMax2;
-                float fGlobalDistance = fGlobalMax - fGlobalMin;
-                float fDist1 = fMax1 - fMin1;
-                float fDist2 = fMax2 - fMin2;
-
-                if (fGlobalDistance > (fDist1 + fDist2))
-                {
-                    return glm::vec4(0, 0, 0, 0);
-                }
-
-                float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
-                if (fPenetration < fMinPenetration)
-                {
-                    fMinPenetration = fPenetration;
-                    ret = glm::vec4(plane.m_v3Normal, fMinPenetration);
-                }
-
-            }
-
-            // 3/3 edge-edge
-            glm::vec3 v3LocalPos = pRigidBody1->m_v3Position;
-            glm::vec3 v3Pos = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalPos, 1.0f));
-            for (int i = 0; i < (int)pConvexTriMesh1->m_listUniqueEdges.size(); i++) 
-            {
-                glm::vec3 v3LocalDir = pConvexTriMesh1->m_listUniqueEdges[i];
-                glm::vec3 v3Dir1 = glm::vec3(pRigidBody1->m_matWorld * glm::vec4(v3LocalDir, 0.0f));
-
-                for (int j = 0; j < (int)pConvexTriMesh2->m_listUniqueEdges.size(); j++) 
-                {
-                    glm::vec3 v3LocalDir = pConvexTriMesh2->m_listUniqueEdges[j];
-                    glm::vec3 v3Dir2 = glm::vec3(pRigidBody2->m_matWorld * glm::vec4(v3LocalDir, 0.0f));
-
-                    if (true == Physics::IsParallel(v3Dir1, v3Dir2))
-                    {
-                        continue;
-                    }
-
-                    glm::vec3 v3Normal = glm::normalize(glm::cross(v3Dir1, v3Dir2));
-
-                    Plane plane(v3Pos, v3Normal);
-
-                    float fMin1, fMax1;
-                    GetMinMax(pRigidBody1, &plane, &fMin1, &fMax1);
-                    float fMin2, fMax2;
-                    GetMinMax(pRigidBody2, &plane, &fMin2, &fMax2);
-
-                    float fGlobalMin = (fMin1 < fMin2) ? fMin1 : fMin2;
-                    float fGlobalMax = (fMax1 > fMax2) ? fMax1 : fMax2;
-                    float fGlobalDistance = fGlobalMax - fGlobalMin;
-                    float fDist1 = fMax1 - fMin1;
-                    float fDist2 = fMax2 - fMin2;
-
-                    if (fGlobalDistance > (fDist1 + fDist2))
-                    {
-                        return glm::vec4(0, 0, 0, 0);
-                    }
-
-                    float fPenetration = (fDist1 + fDist2) - fGlobalDistance;
-                    if (fPenetration < fMinPenetration)
-                    {
-                        fMinPenetration = fPenetration;
-                        ret = glm::vec4(plane.m_v3Normal, fMinPenetration);
-                    }
-                }
-            }
-
-            return ret;
-        }
-
-        Triangle* FindBestTriangle(RigidBody* pRigidBody, glm::vec3 v3Dir) 
-        {
-            Triangle* pRet = nullptr;
-
-            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
-
-            for (int i = 0; i < (int)pConvexTriMesh->m_listTriangles.size(); i++)
-            {
-                Triangle *pTriangle = &(pConvexTriMesh->m_listTriangles[i]);
-                glm::vec3 v3LocalNormal = pTriangle->m_v3Normal;
-                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
-
-                if (nullptr == pRet) 
-                { 
-                    pRet = pTriangle; 
-                }
-                else if (glm::angle(v3Dir, v3Normal) < glm::angle(v3Dir, pRet->m_v3Normal))
-                {
-                    pRet = pTriangle;
-                }
-            }
-
-            return pRet;
-        }
-
-        void FindSameTriangles(RigidBody* pRigidBody, Triangle* pBestTriangle, std::vector<Triangle*>* pRet) 
-        {
-            glm::vec3 v3BestNormal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(pBestTriangle->m_v3Normal, 0.0f)));
-
-            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
-
-            for (int i = 0; i < (int)pConvexTriMesh->m_listTriangles.size(); i++)
-            {
-                Triangle* pTriangle = &(pConvexTriMesh->m_listTriangles[i]);
-                glm::vec3 v3LocalNormal = pTriangle->m_v3Normal;
-                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalNormal, 0.0f)));
-
-                float fAngle = glm::angle(v3BestNormal, v3Normal);
-
-                if (fAngle < glm::radians(0.1f)) 
-                {
-                    (*pRet).push_back(pTriangle);
-                }
-
-            }
-        }
-
-        void GeneratePlanesAndLines(RigidBody* pRigidBody, std::vector<Triangle*> *pListTriangles, std::vector<Plane> *pListPlanes, std::vector<Line>* pListLines)
-        {
-            struct ConvexTriMesh* pConvexTriMesh = &(m_listConvexTriMeshs[pRigidBody->m_nConvexTriMeshId]);
-
-            for (int i = 0; i < (int)(*pListTriangles).size(); i++) 
-            {
-                Triangle* pTriangle = (*pListTriangles)[i];
-
-                glm::vec3 v3LocalA = pConvexTriMesh->m_listVertices[pTriangle->m_nAId];
-                glm::vec3 v3LocalB = pConvexTriMesh->m_listVertices[pTriangle->m_nBId];
-                glm::vec3 v3LocalC = pConvexTriMesh->m_listVertices[pTriangle->m_nCId];
-
-                glm::vec3 v3A = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalA, 1.0f));
-                glm::vec3 v3B = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalB, 1.0f));
-                glm::vec3 v3C = glm::vec3(pRigidBody->m_matWorld * glm::vec4(v3LocalC, 1.0f));
-
-                glm::vec3 v3Normal = glm::normalize(glm::vec3(pRigidBody->m_matWorld * glm::vec4(pTriangle->m_v3Normal, 0.0f)));
-
-                // front
-                Plane planeFront;
-                planeFront.m_v3Pos = v3A;
-                planeFront.m_v3Normal = v3Normal;
-                
-                // a
-                Plane planeA;
-                glm::vec3 v3AB = glm::normalize(v3B - v3A);
-                planeA.m_v3Normal = glm::normalize(glm::cross(v3AB, v3Normal));
-                planeA.m_v3Pos = v3A;
-
-                // b
-                Plane planeB;
-                glm::vec3 v3BC = glm::normalize(v3C - v3B);
-                planeB.m_v3Normal = glm::normalize(glm::cross(v3BC, v3Normal));
-                planeB.m_v3Pos = v3B;
-
-                // c
-                Plane planeC;
-                glm::vec3 v3CA = glm::normalize(v3A - v3C);
-                planeC.m_v3Normal = glm::normalize(glm::cross(v3CA, v3Normal));
-                planeC.m_v3Pos = v3C;
-
-                // planes
-                (*pListPlanes).push_back(planeFront);
-                (*pListPlanes).push_back(planeA);
-                (*pListPlanes).push_back(planeB);
-                (*pListPlanes).push_back(planeC);
-
-                // lines
-                Line lineAB(v3B, v3A);
-                Line lineBC(v3C, v3B);
-                Line lineCA(v3A, v3C);
-
-                (*pListLines).push_back(lineAB);
-                (*pListLines).push_back(lineBC);
-                (*pListLines).push_back(lineCA);
-            }
-        }
-
-        bool IsInside(glm::vec3 v3Point, Plane *pListPlanes) 
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                Plane plane = pListPlanes[i];
-                if (plane.GetDistance(v3Point) > 0.001f) 
-                {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        void GenerateHits(RigidBody* pRigidBody1, RigidBody* pRigidBody2, glm::vec3 v3Normal, float fPenetration,  Plane *pConvexPlanes1, Plane *pConvexPlanes2, Line *pLines1, Line *pLines2, struct Hits *pHits)
-        {
-            // RigidBody1 pontok benne vannak RigidBody2-ben?
-            for (int i = 0; i < 3; i++) 
-            {
-                glm::vec3 v3Point = pLines1[i].m_v3A;
-
-                if (true == IsInside(v3Point, pConvexPlanes2)) 
-                {
-                    //if (pRigidBody2->m_fMass > 0.0f)
-                    {
-                        struct Hit hit;
-                        //hit.m_pRigidBody1 = pRigidBody1;
-                        hit.m_pRigidBody2 = pRigidBody2;
-                        hit.m_v3PointInWorld = v3Point;
-                        hit.m_v3NormalInWorld = v3Normal;
-                        hit.m_fPenetration = std::fabs(fPenetration);
-
-                        (*pHits).m_listHits.push_back(hit);
-                    }
-
-                    /*if (pRigidBody2->m_fMass > 0.0f)
-                    {
-                        struct Hit hit;
-                        //hit.m_pRigidBody1 = pRigidBody1;
-                        hit.m_pRigidBody2 = pRigidBody2;
-                        hit.m_v3PointInWorld = v3Point;
-                        hit.m_v3NormalInWorld = -v3Normal;
-                        hit.m_fPenetration = std::fabs(fPenetration);
-
-                        (*pHits).m_listHits.push_back(hit);
-                    }*/
-                }
-            }
-            
-            // RigidBody1 edges-ei metszi RigidBody2 plane-eit?
-            for (int i = 0; i < 3; i++) 
-            {
-                Line *pLine = &(pLines1[i]);
-
-                for (int j = 0; j < 4; j++) 
-                {
-                    Plane *pPlane = &(pConvexPlanes2[j]);
-
-                    glm::vec3 v3Point;
-                    if (true == Physics::IntersectPlaneLine(pPlane, pLine, &v3Point) && true == IsInside(v3Point, pConvexPlanes2))
-                    {
-                        //if (pRigidBody2->m_fMass > 0.0f)
-                        {
-                            struct Hit hit;
-                            //hit.m_pRigidBody1 = pRigidBody1;
-                            hit.m_pRigidBody2 = pRigidBody2;
-                            hit.m_v3PointInWorld = v3Point;
-                            hit.m_v3NormalInWorld = v3Normal;
-                            hit.m_fPenetration = std::fabs(fPenetration);
-
-                            (*pHits).m_listHits.push_back(hit);
-                        }
-
-                        /*if (pRigidBody2->m_fMass > 0.0f)
-                        {
-                            struct Hit hit;
-                            //hit.m_pRigidBody1 = pRigidBody1;
-                            hit.m_pRigidBody2 = pRigidBody2;
-                            hit.m_v3PointInWorld = v3Point;
-                            hit.m_v3NormalInWorld = -v3Normal;
-                            hit.m_fPenetration = std::fabs(fPenetration);
-
-                            (*pHits).m_listHits.push_back(hit);
-                        }*/
-                    }
-
-                }
-            }
-
-        }
-
         bool CollisionDetection(RigidBody *pRigidBody1, RigidBody *pRigidBody2, Hits* pHits)
         {
             if (pRigidBody1->m_fMass <= 0.0f && pRigidBody2->m_fMass <= 0.0f) 
@@ -860,91 +878,36 @@ namespace PhysicsCPU
                 return false;
             }
 
-            glm::vec4 separate = SAT(pRigidBody1, pRigidBody2);
-            glm::vec3 v3SeparateNormal = glm::vec3(separate.x, separate.y, separate.z);
-            float fPenetration = separate.w;
 
-            if (glm::length(v3SeparateNormal) < 0.001f)
+            Simplex simplex;
+            if (true == GJK(pRigidBody1, pRigidBody2, simplex)) 
             {
-                //printf("Coll false\n");
-                return false;
-            }
-            else
-            {
-                //printf("Coll ok\n");
-            }
-
-            // Find best triangle
-            glm::vec3 v3RB1Dir;
-            {
-                glm::vec3 v3ToRB2 = glm::normalize(pRigidBody2->m_v3Position - pRigidBody1->m_v3Position);
-                if (glm::angle(v3SeparateNormal, v3ToRB2) < glm::radians(90.0f)) { v3RB1Dir = v3SeparateNormal; }
-                else { v3RB1Dir = -v3SeparateNormal; }
-            }
-
-            glm::vec3 v3RB2Dir;
-            {
-                glm::vec3 v3ToRB1 = glm::normalize(pRigidBody1->m_v3Position - pRigidBody2->m_v3Position);
-                if (glm::angle(v3SeparateNormal, v3ToRB1) < glm::radians(90.0f)) { v3RB2Dir = v3SeparateNormal; }
-                else { v3RB2Dir = -v3SeparateNormal; }
-            }
-
-            Triangle *pRB1BestTriangle = FindBestTriangle(pRigidBody1, v3RB1Dir);
-            Triangle *pRB2BestTriangle = FindBestTriangle(pRigidBody2, v3RB2Dir);
-
-            // Find same triangles
-            std::vector<Triangle*> listRB1LocalTriangles;
-            std::vector<Triangle*> listRB2LocalTriangles;
-            FindSameTriangles(pRigidBody1, pRB1BestTriangle, &listRB1LocalTriangles);
-            FindSameTriangles(pRigidBody2, pRB2BestTriangle, &listRB2LocalTriangles);
-
-            // Generate planes
-            std::vector<Plane> listRB1Planes;
-            std::vector<Plane> listRB2Planes;
-            std::vector<Line> listRB1Lines;
-            std::vector<Line> listRB2Lines;
-            GeneratePlanesAndLines(pRigidBody1, &listRB1LocalTriangles, &listRB1Planes, &listRB1Lines);
-            GeneratePlanesAndLines(pRigidBody2, &listRB2LocalTriangles, &listRB2Planes, &listRB2Lines);
-            
-            for (int i = 0; i < (int)listRB1LocalTriangles.size(); i++)
-            {
-                Plane *pConvexPlanes1 = &(listRB1Planes[i * 4]);
-                Line* pLines1 = &(listRB1Lines[i * 3]);
-
-                for (int j = 0; j < (int)listRB2LocalTriangles.size(); j++)
+                Hit hit;
+                if (true == EPA(pRigidBody1, pRigidBody2, simplex, &hit))
                 {
-                    Plane* pConvexPlanes2 = &(listRB2Planes[j * 4]);
-                    Line* pLines2 = &(listRB2Lines[j * 3]);
-
-                    struct Hits hits2;
-                    GenerateHits(pRigidBody1, pRigidBody2, v3RB1Dir, fPenetration, pConvexPlanes1, pConvexPlanes2, pLines1, pLines2, &hits2);
-                    GenerateHits(pRigidBody2, pRigidBody1, v3RB1Dir, fPenetration, pConvexPlanes2, pConvexPlanes1, pLines2, pLines1, &hits2);
-
-                    for (int j = 0; j < (int)hits2.m_listHits.size(); j++)
-                    {
-                        struct Hit hit2 = hits2.m_listHits[j];
-
-                        {
-                            pHits->m_listHits.push_back(hit2);
-                        }
-                                                
-                    }
-
+                    pHits->m_listHits.push_back(hit);
+                    return true;
                 }
             }
-
-            return ((int)pHits->m_listHits.size() > 0);
+            
             //return true;
+            return false;
         }
 
         void CollisionDetection() 
         {
+            for (int i = 0; i < m_listRigidBodies.size(); i++) 
+            {
+                struct RigidBody* pRigidBody1 = &(m_listRigidBodies[i]);
+                struct Hits* pHits = &(m_listHits[pRigidBody1->m_nHitId]);
+
+                pHits->Clear();
+            }
+
             for (int i = 0; i < m_listRigidBodies.size(); i++)
             {
                 struct RigidBody *pRigidBody1 = &(m_listRigidBodies[i]);
                 struct Hits* pHits = &(m_listHits[pRigidBody1->m_nHitId]);
-
-                pHits->Clear();
 
                 for (int j = 0; j < m_listRigidBodies.size(); j++) 
                 {
@@ -953,26 +916,15 @@ namespace PhysicsCPU
                     if (i != j) 
                     {
                         CollisionDetection(pRigidBody1, pRigidBody2, pHits);
+
+                        /*if (false == CollisionDetection(pRigidBody1, pRigidBody2, pHits))
+                        {
+                            CollisionDetection(pRigidBody2, pRigidBody1, pHits);
+                        }*/
                     }
 
                 }
             }
-        }
-
-        bool IsContains(std::vector<glm::vec3> *pListNormals, glm::vec3 v3Normal) 
-        {
-            for (int i = 0; i < (int)(*pListNormals).size(); i++)
-            {
-                float fAngleRad = glm::angle((*pListNormals)[i], v3Normal);
-                float fAngle = glm::degrees(fAngleRad);
-
-                if (fAngle < 0.1f)
-                {
-                    return true;
-                }
-            }
-
-            return false;
         }
 
         void ResolveCollisionWithFriction(RigidBody* body, glm::vec3 collisionPoint, glm::vec3 normal)
