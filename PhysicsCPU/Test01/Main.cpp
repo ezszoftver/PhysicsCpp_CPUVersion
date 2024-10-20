@@ -142,7 +142,7 @@ bool Init()
 		CreateCube(glm::vec3(i * 0.7f, 0.75f + (i * 1.2f), 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(/*1.0f, 0.2f, 0.5f*/0.5f, 0.5f, 0.5f), 10.0f);
 	}
 
-	CreateCube(glm::vec3(0, -0.5f, 0), glm::quat(glm::radians(glm::vec3(180.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
+	CreateCube(glm::vec3(0, 1.0f, 0), glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f))), glm::vec3(0.5f, 0.5f, 0.5f), 1.0f);
 
 	// camera
 	m_Camera.Init(glm::vec3(5, 5, 7), glm::vec3(0, 0, 0));

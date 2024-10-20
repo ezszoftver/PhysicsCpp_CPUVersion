@@ -410,13 +410,10 @@ namespace PhysicsCPU
         }
 
         // Minkowski-differencia támogatási függvénye
-        glm::vec3 Support(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, glm::mat4 transformA, glm::mat4 transformB, const glm::vec3& direction, glm::vec3* pointA, glm::vec3* pointB)
+        glm::vec3 Support(const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, const glm::vec3& direction, glm::vec3* pointA, glm::vec3* pointB)
         {
             glm::vec3 furthestA = FindFurthestPoint(colliderA, direction);
             glm::vec3 furthestB = FindFurthestPoint(colliderB, -direction);
-
-            furthestA = transformA * glm::vec4(furthestA, 1.0f);
-            furthestB = transformB * glm::vec4(furthestB, 1.0f);
 
             if (pointA) *pointA = furthestA;
             if (pointB) *pointB = furthestB;
@@ -549,15 +546,31 @@ namespace PhysicsCPU
 
         bool GJK(/*const std::vector<glm::vec3>& colliderA, const std::vector<glm::vec3>& colliderB, glm::mat4 transformA, glm::mat4 transformB,*/RigidBody* pRigidBody1, RigidBody* pRigidBody2, Simplex& points)
         {
-            const std::vector<glm::vec3>& colliderA = m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId].m_listUniqueVertices;
-            const std::vector<glm::vec3>& colliderB = m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId].m_listUniqueVertices;
+            const std::vector<glm::vec3>& colliderA0 = m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId].m_listUniqueVertices;
+            const std::vector<glm::vec3>& colliderB0 = m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId].m_listUniqueVertices;
             const glm::mat4 transformA = pRigidBody1->m_matWorld;
             const glm::mat4 transformB = pRigidBody2->m_matWorld;
+
+            std::vector<glm::vec3> colliderA;
+            for (int i = 0; i < (int)colliderA0.size(); i++)
+            {
+                glm::vec3 v3In = colliderA0[i];
+                glm::vec3 v3Out = glm::vec3(transformA * glm::vec4(v3In, 1.0f));
+                colliderA.push_back(v3Out);
+            }
+
+            std::vector<glm::vec3> colliderB;
+            for (int i = 0; i < (int)colliderB0.size(); i++)
+            {
+                glm::vec3 v3In = colliderB0[i];
+                glm::vec3 v3Out = glm::vec3(transformB * glm::vec4(v3In, 1.0f));
+                colliderB.push_back(v3Out);
+            }
 
             glm::vec3 direction = glm::sphericalRand(1.0f);
 
             glm::vec3 pointA, pointB; // A két test legközelebbi pontjai
-            glm::vec3 support = Support(colliderA, colliderB, transformA, transformB, direction, &pointA, &pointB);
+            glm::vec3 support = Support(colliderA, colliderB, direction, &pointA, &pointB);
 
             // Simplex is an array of points, max count is 4
             points.push_front(support);
@@ -567,7 +580,7 @@ namespace PhysicsCPU
 
             for (int iterations = 0; iterations < MAX_ITERATIONS; iterations++)
             {
-                support = Support(colliderA, colliderB, transformA, transformB, direction, &pointA, &pointB);
+                support = Support(colliderA, colliderB, direction, &pointA, &pointB);
 
                 /*if (dot(support, direction) <= 0)
                 {
@@ -655,10 +668,26 @@ namespace PhysicsCPU
             const Simplex& simplex,
             Hit *pHit)
         {
-            std::vector<glm::vec3>& colliderA = m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId].m_listUniqueVertices;
-            std::vector<glm::vec3>& colliderB = m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId].m_listUniqueVertices;
+            std::vector<glm::vec3>& colliderA0 = m_listConvexTriMeshs[pRigidBody1->m_nConvexTriMeshId].m_listUniqueVertices;
+            std::vector<glm::vec3>& colliderB0 = m_listConvexTriMeshs[pRigidBody2->m_nConvexTriMeshId].m_listUniqueVertices;
             glm::mat4 transformA = pRigidBody1->m_matWorld;
             glm::mat4 transformB = pRigidBody2->m_matWorld;
+
+            std::vector<glm::vec3> colliderA;
+            for (int i = 0; i < (int)colliderA0.size(); i++)
+            {
+                glm::vec3 v3In = colliderA0[i];
+                glm::vec3 v3Out = glm::vec3(transformA * glm::vec4(v3In, 1.0f));
+                colliderA.push_back(v3Out);
+            }
+
+            std::vector<glm::vec3> colliderB;
+            for (int i = 0; i < (int)colliderB0.size(); i++)
+            {
+                glm::vec3 v3In = colliderB0[i];
+                glm::vec3 v3Out = glm::vec3(transformB * glm::vec4(v3In, 1.0f));
+                colliderB.push_back(v3Out);
+            }
 
             std::vector<glm::vec3> polytope(simplex.begin(), simplex.end());
             std::vector<size_t> faces =
@@ -685,7 +714,7 @@ namespace PhysicsCPU
                 minNormal = glm::vec3(normals[minFace]);
                 minDistance = normals[minFace].w;
 
-                glm::vec3 support = Support(colliderA, colliderB, transformA, transformB, minNormal, &pointA, &pointB);
+                glm::vec3 support = Support(colliderA, colliderB, minNormal, &pointA, &pointB);
                 float sDistance = glm::dot(minNormal, support);
 
                 bHasCollision = true;
@@ -936,7 +965,7 @@ namespace PhysicsCPU
             glm::vec3 velocity = body->m_v3LinearVelocity + glm::cross(body->m_v3AngularVelocity, rA);
             float velocityAlongNormal = glm::dot(normal, velocity);
 
-            if (velocityAlongNormal > 0) return;
+            //if (velocityAlongNormal > 0) return;
             
             float j = -(1.0f + pMaterial->m_fRestitution) * velocityAlongNormal;
             j /= (1.0f / body->m_fMass + glm::dot(glm::cross(body->GetInvInertia() * glm::cross(rA, normal), rA), normal));
